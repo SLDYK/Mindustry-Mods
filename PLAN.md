@@ -2,7 +2,7 @@
 
 > 目标：重写 Mindustry 桌面端指挥模式（command mode）的操作逻辑，使操作手感与《红色警戒2》一致。
 > 配套文档：**`RA2-CONTROLS.md`** — RA2 操作逻辑与快捷键的权威参考（实现时以其为准）。**鼠标方案只做 RA2 原版默认：左键=选择+下令，右键单击=清空**（用户已确认，不做"左选右令"变体）。**镜头跟随/平移完全保留 Mindustry 原版机制，模组零改动**（用户已确认 2026-09-04）。
-> 状态：**计划阶段**（未动工）。本文档为唯一执行依据，后续实现严格按里程碑推进。
+> 状态：**P2 进行中**（Tier A 输入层约 70%：鼠标语义翻转 + F/X/Home 快捷键已落地并实机验证加载；剩 G 攻击移动、Z 路径点、设置界面）。本文档为唯一执行依据，后续实现严格按里程碑推进。
 > 前置调研：已核对 Mindustry 159 官方源码 `DesktopInput.java` / `InputHandler.java` / `CommandAI.java` / `UnitCommand.java` / `Control.java`（2026-09-03）。
 
 ---
@@ -66,8 +66,9 @@
 | 右键拖拽 | **平移镜头** | 右键=下令 | ❌ 不做：镜头跟随完全保留原版机制（2026-09-04 已定）；指挥模式内右键拖拽无操作 | — |
 | Shift+左键（有选择时空地） | 队列指令 | ✅（`commandQueue` 键） | 保留，改挂左键；**另做可视化路径点模式（Z 按住左键连点，画编号旗帜，RA2 原版键位）** | A |
 | 攻击移动 | 沿路自动接敌，交战后继续/到点恢复 | ❌ 无 | Tier A 近似：移动 + 开启 `pursueTarget` stance；Tier B 真·追击；键位默认 G | A/B |
-| H | 停止（清指令，RA2 的 S 因 WASD 占用移到 H） | F5：`UnitStance.stop` 已有，无快捷键 | 加按键 → `Call.setUnitStance(stop)` | A |
-| X | 散开（就近分散） | 无 | 各单位向自身周围随机点下令（纯输入层可做） | A(可选) |
+| 停止 | S | F5：`UnitStance.stop` 已有，无快捷键 | F 键（原定 H，实测原版 H=`selectAllUnitFactories` 全选工厂被占用，改 F；其原版绑定仅蓝图模式生效） | A |
+| 散开 | X | 无 | 各单位向自身周围随机点下令（纯输入层可做）；注意原版 X 无绑定冲突（`deselect`=X? 实测 X 空闲） | A |
+| 全选同类（RA2 T 键语义） | — | 原 G=`selectAllUnits` 全选指挥单位 | **R7 解除绑定**：G 释放给攻击移动；原"全选单位"功能如需保留可走模组键位（待定） | A(可选) |
 | Home | 跳回最近核心视角 | 无 | 相机平移至最近核心 | A(可选) |
 | T | 选择同类型 | 双击已有 | 加按键触发 `selectTypedUnits` | A(可选) |
 | Ctrl+1..0 / 1..0 | 编队 / 选队 / 双击居中 | ✅ F9（绑定 `blockSelect01..10`、`createControlGroup`） | 保留；确认默认键位后写入文档 | — |
@@ -82,7 +83,31 @@
 
 ## 4. 架构设计
 
-### 4.1 分层
+### 4.1 分层与"接管矩阵"架构（2026-09-09 定案）
+
+> **架构决策（用户已确认，2026-09-09 二次定案）**：采用**行为层替换 + 状态层保留**的接管矩阵方案，而非"commandMode 恒 false 的纯替换式"。**原版指挥专属键一律解除绑定（unset）**——不是代码层屏蔽，而是让原版指挥快捷键的绑定全部清空：原版 `keyTap(Binding.xxx)` 分支原样存在但永不触发，指挥操作 100% 由模组键位（设置→控制→RA2 分组）定义，与原版按键零冲突。
+> 理由（经反汇编本机 desktop.jar v8/159.7 + 官方 v8 源码逐行核对）：
+> 1. 原版指挥逻辑全部有 `if(commandMode)` 守卫，是**封闭集合**（下表 12 项），`minGameVersion` 锁定后不会新增——冲突面天然有限；
+> 2. `pollInputPlayer()` 为包私有不可覆写，若 commandMode 恒 false，指挥模式下左键会掉进原版普通分支（误采矿/误开枪/弹建筑配置 UI），只能每帧消毒 3 个状态，脆且不可靠；
+> 3. `commandMode=true` 本身是引擎护栏（`canShoot()` 排除指挥模式、`pollInputPlayer` 分支互斥），保留它 = 保留引擎送的保护。
+> 由此冲突面从"每个钩子与原版的隐式交互"收敛为"下表 12 项"，每次 Mindustry 升级只需对照复核。
+
+**接管矩阵（v8 / build 159.7 实测；每项处置 = 模组的最终行为）**：
+
+| # | 原版指挥行为 | 原版位置 | 处置 | 模组实现 |
+|---|-------------|---------|------|---------|
+| R1 | 指挥模式开关（toggle/hold 二态 + boost 冲突自动禁用） | `DesktopInput.update()` | **托管** | 强制切换式（`commandmodehold` 每帧翻回 false） |
+| R2 | 左键单击=toggle 选择 / 双击=屏幕同类 | `DesktopInput.tap()` | **替换** | RA2 替换语义（`Ra2Input.tap` 已实现） |
+| R3 | 右键=下令移动/攻击 | `DesktopInput.touchDown()` | **替换** | 右键=清空选择（`touchDown` 拦截 + `tap` 判单击） |
+| R4 | 左键按下启动框选 `commandRect` | `pollInputPlayer()`（包私有） | **复用** | 直接借用生命周期（含 `tap` 的 `tappedOne` 抑制单击误判） |
+| R5 | 松开左键结算框选（内部调 `multiUnitSelect()`） | `update()` 尾部 | **适配** | 覆写 `multiUnitSelect()`=Shift（框选并入，F7） |
+| R6 | `commandTap()` 下令路径 | `InputHandler` | **替换** | 左键触发移动/攻击（`tap` → `commandTap`，已实现） |
+| R7 | G=全选指挥单位 / H=全选工厂（默认键实测） | `update()` 指挥块 | **解除绑定** | `unset()` 清空 select_all_units(G)/select_all_unit_factories(H)/select_all_unit_transport，G 彻底释放给模组攻击移动 |
+| R8 | 编组 Ctrl+数字 / 数字选队 / 双击居中 | `update()` 指挥块 | **保留绑定** | 与 RA2 语义一致，零改动 |
+| R9 | commandQueue 键=鼠标中键追加队列指令 | `pollInputPlayer()` | **解除绑定** | 模组队列语义 = Shift+左键，原版中键队列不需要 |
+| R10 | 有选择时悬停敌人→攻击光标 | `pollInputPlayer()` 尾部 | **保留** | RA2 §4 光标状态机直接复用 |
+| R11 | 选中圈/目标线/队列线绘制 | `drawCommanded()` 系列 | **保留** | 复用；未来 Z 路径点旗帜用 `drawTop` 追加绘制 |
+| R12 | 指挥模式禁止射击/采矿/配置误触发 | `canShoot()`/`pollInputPlayer` | **依赖** | 引擎护栏，保留 commandMode 即免费获得 |
 
 ```
 Tier A（纯客户端输入层）        Tier B（内容层，可选）
@@ -145,24 +170,25 @@ f:\SteamTools\Mindustry\ra2-controls\
 ## 5. 里程碑
 
 ### P0 — Spike 验证（0.5–1 天）
-- [ ] 运行时打印 `Version.number`，确认 `minGameVersion` 取值（A3）
-- [ ] 最小模组（仅 `Log.info`）跑通 `gradlew jar` → 游戏加载
-- [ ] 实测 `control.setInput` 替换后：建造/采矿/指挥模式全部正常（F1/F2 的时序假设）
-- [ ] 验证 A1（动态注册 KeyBind）；A2 已结案（边缘滚动无且不做）
+- [x] 运行时打印 `Version.number`，确认 `minGameVersion` 取值（A3）
+- [x] 最小模组（仅 `Log.info`）跑通 `gradlew jar` → 游戏加载
+- [x] 实测 `control.setInput` 替换后：建造/采矿/指挥模式全部正常（F1/F2 的时序假设）
+- [x] 验证 A1（动态注册 KeyBind，已实现 `KeyBind.add` + RA2 分类）；A2 已结案（边缘滚动无且不做）
 - [ ] 产出：`DESKTOP_INPUT_HOOKS.md`（DesktopInput 可重写方法清单及调用时机）
-- **验收**：最小模组进对局无报错，替换输入后原版功能无损
+- **验收**：最小模组进对局无报错，替换输入后原版功能无损 ✅
 
 ### P1 — 工程脚手架（0.5 天）
-- [ ] 建 `ra2-controls` Gradle 工程（依赖 Mindustry 159 + arc）
-- [ ] `mod.hjson`、`Ra2Mod` 骨架、安装器（含"已是 Ra2Input 则跳过"防重入）
-- [ ] 扩展 `tools/pack.ps1`：`-Mod ra2-controls` 参数化打包/安装；加 VS Code 任务
-- **验收**：空壳模组安装进游戏，任务一键构建+安装
+- [x] 建 `ra2-controls` Gradle 工程（编译基准为本机 Steam 版 desktop.jar，compileOnly 离线构建）
+- [x] `mod.hjson`、`Ra2Mod` 骨架、安装器（含"已是 Ra2Input 则跳过"防重入）
+- [x] 扩展 `tools/pack.ps1`：`-Mod ra2-controls` 参数化打包/安装；加 VS Code 任务；**已补 macOS 侧 `tools/pack.sh` + build.gradle 跨平台探测（2026-09-09）**
+- **验收**：空壳模组安装进游戏，任务一键构建+安装 ✅（macOS/Windows 双平台构建链均验证通过）
 
 ### P2 — Tier A 输入层（2–3 天，核心交付）
-- [ ] **鼠标语义翻转**：左键=选择+下令（有选择时）、右键单击=清空（右键拖拽无操作，镜头零改动）
-- [ ] RA2 单击选择语义 + Shift 语义（点击与框选）
+- [x] **鼠标语义翻转**：左键=选择+下令（有选择时）、右键单击=清空（右键拖拽无操作，镜头零改动；`touchDown` 完整拦截原版右键下令，§6 最高风险项已解除）
+- [x] RA2 单击选择语义 + Shift 语义（点击与框选）
+- [x] F 停止（原 H 被原版"选中全部单位工厂"占用，改 F）；X 散开；Home 回核心（各注册自定义 KeyBind，设置→控制→RA2 分组可改绑）
 - [ ] Ctrl 框选剔除（可选开关）
-- [ ] H 停止；X 散开；Home 回核心；T 同类选择（各带开关）
+- [ ] T 同类选择按键触发（双击已等价）
 - [ ] 攻击移动 Tier A 近似（待命键→光标变红→左键下达 移动+pursueTarget）
 - [ ] Z+左键可视化路径点模式（RA2 原版键位；编号旗帜、松开批量下发 queue 指令）
 - [ ] 设置界面（逐项开关 + 键位说明）+ 中英 bundle

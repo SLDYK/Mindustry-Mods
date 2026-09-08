@@ -17,7 +17,36 @@ compileJava {
 
 // 以本机 Steam 版 desktop.jar 为编译基准（v8 / build 159.7，字节码 v61）
 // 无外部依赖（compileOnly 本地 jar），完全离线构建，无需 repositories
-def mindustryJar = System.getenv("MINDUSTRY_JAR") ?: "E:/SteamLibrary/steamapps/common/Mindustry/jre/desktop.jar"
+// 探测顺序：环境变量 MINDUSTRY_JAR → 各平台常见 Steam 库位置
+def findMindustryJar() {
+    def env = System.getenv("MINDUSTRY_JAR")
+    if (env != null && new File(env).isFile()) return env
+
+    def home = System.getProperty("user.home")
+    def candidates = [
+        // Windows：Steam 库常见盘符（含原 E:/SteamLibrary 布局）
+        "C:/Program Files (x86)/Steam/steamapps/common/Mindustry/jre/desktop.jar",
+        "D:/SteamLibrary/steamapps/common/Mindustry/jre/desktop.jar",
+        "E:/SteamLibrary/steamapps/common/Mindustry/jre/desktop.jar",
+        // macOS：Steam 库可能在外置盘（本机实际位置），再兜底默认库
+        "/Volumes/ORICO/SteamLibrary/steamapps/common/Mindustry/Mindustry.app/Contents/Resources/desktop.jar",
+        "${home}/Library/Application Support/Steam/steamapps/common/Mindustry/Mindustry.app/Contents/Resources/desktop.jar",
+        // Linux
+        "${home}/.steam/steam/steamapps/common/Mindustry/desktop.jar",
+        "${home}/.local/share/Steam/steamapps/common/Mindustry/desktop.jar",
+    ]
+    for (c in candidates) {
+        def f = new File(c)
+        if (f.isFile()) return f.absolutePath
+    }
+    return null
+}
+
+def mindustryJar = findMindustryJar()
+if (mindustryJar == null) {
+    throw new GradleException("未找到 Mindustry desktop.jar：请设环境变量 MINDUSTRY_JAR 指向 desktop.jar，或确认 Steam 版已安装。")
+}
+println "[ra2] Mindustry jar: ${mindustryJar}"
 
 dependencies {
     compileOnly files(mindustryJar)
@@ -32,12 +61,31 @@ jar {
 }
 
 // 便捷任务：直接把 jar 复制到游戏的 mods 目录
-// （Steam 版数据目录 = 游戏目录\saves\mods；其它安装默认 %APPDATA%\Mindustry\mods）
+// Steam 版数据目录探测：Windows = 游戏目录\saves\mods；macOS/Linux = ~/Library/Application Support/Mindustry/mods
+// （Steam 版 Mindustry 在 Windows 上把 saves 放游戏目录，其它平台放用户数据目录；非 Steam 安装同理回退）
 def detectModsDir() {
-    def steamDir = new File("E:/SteamLibrary/steamapps/common/Mindustry/saves/mods")
-    if (steamDir.isDirectory()) return steamDir
+    def home = System.getProperty("user.home")
+    // Windows：沿用原盘符布局
+    def winCandidates = [
+        "E:/SteamLibrary/steamapps/common/Mindustry/saves/mods",
+        "C:/Program Files (x86)/Steam/steamapps/common/Mindustry/saves/mods",
+        "D:/SteamLibrary/steamapps/common/Mindustry/saves/mods",
+    ]
+    if (System.getProperty("os.name").toLowerCase().contains("windows")) {
+        for (c in winCandidates) {
+            def d = new File(c)
+            if (d.isDirectory()) return d
+        }
+    }
+    // macOS：用户数据目录（本机 Steam 版实测 saves 不在游戏目录）
+    def macData = new File(home, "Library/Application Support/Mindustry/mods")
+    if (macData.isDirectory() || System.getProperty("os.name").toLowerCase().contains("mac")) return macData
+    // Linux：用户数据目录
+    def linuxData = new File(home, ".local/share/Mindustry/mods")
+    if (linuxData.isDirectory()) return linuxData
+    // 最终回退：APPDATA（Windows 非 Steam）或 mac 数据目录
     def appdata = System.getenv("APPDATA")
-    return appdata != null ? new File(appdata, "Mindustry/mods") : new File("Mindustry/mods")
+    return appdata != null ? new File(appdata, "Mindustry/mods") : macData
 }
 
 tasks.register('installMod', Copy) {

@@ -4,18 +4,26 @@
         {
             "label": "RA2: 构建并安装 (ra2-controls)",
             "type": "shell",
-            "command": "powershell",
-            "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/pack.ps1", "-Install"],
+            "command": "bash",
+            "args": ["${workspaceFolder}/tools/pack.sh", "--install"],
             "problemMatcher": [],
-            "presentation": { "reveal": "always" }
+            "presentation": { "reveal": "always" },
+            "windows": {
+                "command": "powershell",
+                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/pack.ps1", "-Install"]
+            }
         },
         {
             "label": "RA2: 构建 (ra2-controls)",
             "type": "shell",
-            "command": "powershell",
-            "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/pack.ps1"],
+            "command": "bash",
+            "args": ["${workspaceFolder}/tools/pack.sh"],
             "problemMatcher": [],
-            "presentation": { "reveal": "always" }
+            "presentation": { "reveal": "always" },
+            "windows": {
+                "command": "powershell",
+                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/pack.ps1"]
+            }
         }
     ]
 }
