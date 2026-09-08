@@ -1,0 +1,51 @@
+plugins {
+    id 'java'
+}
+
+group = 'ra2'
+version = '0.1.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+compileJava {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << "-parameters"
+}
+
+// 以本机 Steam 版 desktop.jar 为编译基准（v8 / build 159.7，字节码 v61）
+// 无外部依赖（compileOnly 本地 jar），完全离线构建，无需 repositories
+def mindustryJar = System.getenv("MINDUSTRY_JAR") ?: "E:/SteamLibrary/steamapps/common/Mindustry/jre/desktop.jar"
+
+dependencies {
+    compileOnly files(mindustryJar)
+}
+
+jar {
+    archiveFileName = "ra2-controls.jar"
+    // 模组 jar：不含任何 Mindustry/arc 类（compileOnly），只打包自身 + 资源
+    from sourceSets.main.output
+    from("mod.hjson")            // mod.hjson 必须在 jar 根目录
+    from("assets")               // bundles（键位名/分类名本地化）等资源
+}
+
+// 便捷任务：直接把 jar 复制到游戏的 mods 目录
+// （Steam 版数据目录 = 游戏目录\saves\mods；其它安装默认 %APPDATA%\Mindustry\mods）
+def detectModsDir() {
+    def steamDir = new File("E:/SteamLibrary/steamapps/common/Mindustry/saves/mods")
+    if (steamDir.isDirectory()) return steamDir
+    def appdata = System.getenv("APPDATA")
+    return appdata != null ? new File(appdata, "Mindustry/mods") : new File("Mindustry/mods")
+}
+
+tasks.register('installMod', Copy) {
+    dependsOn jar
+    def modsDir = detectModsDir()
+    from(jar.archiveFile)
+    into(modsDir)
+    doLast {
+        println "Installed ra2-controls.jar to ${modsDir}"
+    }
+}

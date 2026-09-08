@@ -1,0 +1,8 @@
+name: ra2-controls
+displayName: "RA2 Controls"
+author: SLDYK
+description: "RA2-style command mode controls for Mindustry desktop"
+version: "0.1.0"
+minGameVersion: "157.1"
+hidden: true
+main: ra2.Ra2Mod

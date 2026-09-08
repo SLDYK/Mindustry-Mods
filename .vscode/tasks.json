@@ -1,0 +1,21 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "RA2: 构建并安装 (ra2-controls)",
+            "type": "shell",
+            "command": "powershell",
+            "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/pack.ps1", "-Install"],
+            "problemMatcher": [],
+            "presentation": { "reveal": "always" }
+        },
+        {
+            "label": "RA2: 构建 (ra2-controls)",
+            "type": "shell",
+            "command": "powershell",
+            "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/pack.ps1"],
+            "problemMatcher": [],
+            "presentation": { "reveal": "always" }
+        }
+    ]
+}

@@ -1,0 +1,21 @@
+{
+    // Mindustry 模组开发工作区设置
+    "files.associations": {
+        "*.hjson": "hjson"
+    },
+    "files.eol": "\n",
+    "files.encoding": "utf8",
+    "files.exclude": {
+        "dist": true,
+        "**/__pycache__": true
+    },
+    "editor.insertSpaces": true,
+    "editor.tabSize": 4,
+    "[hjson]": {
+        "editor.formatOnSave": false
+    },
+    "search.exclude": {
+        "dist/**": true
+    },
+    "java.configuration.updateBuildConfiguration": "interactive"
+}
