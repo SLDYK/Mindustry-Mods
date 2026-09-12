@@ -12,10 +12,11 @@ import mindustry.mod.Mod;
 /**
  * Enemy Pause 模组入口。
  *
- * 功能：战役模式下按一个键，暂停 / 继续敌方侧的各种倒计时——下一波进攻、
- * 敌方基地扩建与部队调度、敌方工厂的激活与生产。
+ * 功能：战役模式下按一个键，暂停 / 继续敌方侧的倒计时——下一波进攻、
+ * 敌方基地扩建与部队调度的计时。
  *
- * 冻结的细节见 EnemyTimers，状态机见 EnemyPause。
+ * 冻的只是「倒计时」，不是敌人本身：已在场单位照常打，工厂照常生产。
+ * 细节见 EnemyTimers，状态机见 EnemyPause。
  */
 public class EnemyPauseMod extends Mod{
 

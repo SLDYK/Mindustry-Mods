@@ -7,37 +7,34 @@ import arc.util.Time;
 import mindustry.Vars;
 import mindustry.ai.BaseBuilderAI;
 import mindustry.ai.RtsAI;
-import mindustry.game.Rules.TeamRule;
-import mindustry.game.Team;
 import mindustry.game.Teams.TeamData;
-import mindustry.gen.Building;
-import mindustry.world.blocks.units.UnitBlock.UnitBuild;
 
 import java.lang.reflect.Field;
 
 /**
- * 冻结「敌方侧」的各类倒计时：一个实例代表一次暂停会话。
+ * 冻结敌方侧的倒计时：一个实例代表一次暂停会话。
  *
  * 用法（都由 EnemyPause 驱动）：
  *   capture()  暂停瞬间记录各倒计时当前的读数
  *   hold()     每帧（Trigger.afterGameUpdate）写回读数，抵消这一帧的时间推进
  *   release()  手动恢复时把读数还原，让敌人的节奏接着暂停前走
  *
- * 覆盖的倒计时（括号里是 mindustry v160.1 的源码位置）：
+ * 冻结的两项（括号里是 mindustry v160.1 的源码位置）：
  *
- *   1. 下一波进攻倒计时    state.wavetime
+ *   1. 下一波进攻倒计时    state.wavetime——界面上那个「敌人来袭 x:xx」
  *                          （Logic.update()：先按 Time.delta 递减，再判 <=0 则 runWave()）
  *
  *   2. 敌方 AI 计时器      BaseBuilderAI.timer（基地扩建、AI 核心单位、路径刷新）
  *                          RtsAI.timer（部队调度、AI 核心单位）
  *                          （Logic.update() 的 TeamData 循环里调用两者的 update()）
  *
- *   3. 敌方工厂激活倒计时  Team.activateUnitFactories() 判的是
- *                          state.tick >= 激活延迟，埃里基尔上默认是进图 2 小时后
+ * 两项都只是把「下一件事什么时候发生」按住，不是把敌人本身按住：
  *
- *   4. 敌方工厂生产进度    UnitFactory / Reconstructor 的 UnitBuild.time 与 progress
+ *   - 已经在场的敌方单位照常行动、开火，只是 AI 不会启动新的扩建批次 / 新的部队调度
+ *   - 敌方工厂照常生产、照常激活，玩家侧的行为也不受影响
  *
- * 都不涉及「已经在场上的敌方单位」——冻住那些等于把敌人本身定住，是另一个需求。
+ * 早期版本还冻过「敌方工厂激活倒计时」和「工厂生产进度」，按需求已移除：
+ * 那两项会表现为敌人的生产行为被卡住，而需求只要求暂停倒计时。
  */
 public class EnemyTimers{
 
@@ -78,13 +75,6 @@ public class EnemyTimers{
     /** 复用的小数组，避免每帧分配。 */
     private final Interval[] tmpIntervals = new Interval[2];
 
-    // ---- 3. 敌方工厂激活倒计时 ----
-    private double tickAtCapture;
-
-    // ---- 4. 敌方工厂生产进度 ----
-    /** 暂停瞬间各敌方工厂的 {time, progress}。 */
-    private final ObjectMap<Building, float[]> production = new ObjectMap<>();
-
     /** 暂停瞬间记录各倒计时的当前读数。 */
     public void capture(){
         frozenWaveTime = Math.max(Vars.state.wavetime, MIN_HOLD_TICKS);
@@ -94,35 +84,26 @@ public class EnemyTimers{
         aiAges.clear();
         rememberAiTimers();
 
-        tickAtCapture = Vars.state.tick;
-
-        production.clear();
-        rememberProduction();
-
         // 敌方 AI 是游戏偷懒创建的（Logic 里 if(data.buildAi == null) ...），
-        // 可能到此刻还没建起来，那时这里就是 0；键进游戏后按 Y 看到的数字
-        // 正好用来判断反射有没有真的接上。
-        Log.info("[enemy-pause] frozen: wave=@ tick, enemyAiTimers=@, enemyFactories=@",
-            (int)frozenWaveTime, aiAges.size, production.size);
+        // 可能到此刻还没建起来，那时这里就是 0。
+        // 实测时可以看这行：一直为 0 就说明反射没接上。
+        Log.info("[enemy-pause] frozen: wave=@ tick, enemyAiTimers=@",
+            (int)frozenWaveTime, aiAges.size);
     }
 
     /**
      * 每帧写回读数。由 Trigger.afterGameUpdate 调用——该时机在倒计时递减、runWave()
-     * 判断、以及敌方 AI 与建筑的这一帧更新之后，正好把这一帧的推进抹掉。
+     * 判断、以及敌方 AI 这一帧的更新之后，正好把这一帧的推进抹掉。
      */
     public void hold(){
         Vars.state.wavetime = frozenWaveTime;
         freezeAiTimers();
-        holdActivation();
-        freezeProduction();
     }
 
     /** 手动恢复时调用：把还来得及还原的读数还原回去。 */
     public void release(){
-        // 波次和工厂激活不用还原：
-        //   - wavetime 写回冻结值本身就意味着"从暂停处接着数"
-        //   - 激活延迟已经被推后，本来就该留在推后后的时间点
-        // AI 计时器必须还原，否则每次暂停都会让敌方 AI 重新数满一整轮。
+        // 波次倒计时不用还原：写回冻结值本身就意味着"从暂停处接着数"。
+        // 但 AI 计时器必须还原，否则每次暂停都会让敌方 AI 重新数满一整轮。
         for(ObjectMap.Entry<Interval, float[]> entry : aiAges){
             float[] times = entry.key.getTimes();
             float[] ages = entry.value;
@@ -131,7 +112,6 @@ public class EnemyTimers{
             }
         }
         aiAges.clear();
-        production.clear();
     }
 
     // ------------------------------------------------------------------
@@ -206,54 +186,6 @@ public class EnemyTimers{
             return (Interval)field.get(ai);
         }catch(Throwable t){
             return null;
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // 3. 敌方工厂激活倒计时
-    // ------------------------------------------------------------------
-
-    private void holdActivation(){
-        Team enemy = Vars.state.rules.waveTeam;
-
-        // 已经激活的不能再推：activateUnitFactories() 一旦为 true 就说明敌方工厂在跑了，
-        // 此时继续加延迟反而会把它们重新关掉
-        if(enemy.activateUnitFactories()) return;
-
-        // state.tick 是全局的（玩家侧也用它），没法只冻敌人，只好反着把激活时间往后推相同的量
-        double now = Vars.state.tick;
-        TeamRule rule = enemy.rules();
-        rule.unitFactoryActivationDelay += (float)(now - tickAtCapture);
-        tickAtCapture = now;
-    }
-
-    // ------------------------------------------------------------------
-    // 4. 敌方工厂生产进度
-    // ------------------------------------------------------------------
-
-    private void rememberProduction(){
-        for(Building build : Vars.state.rules.waveTeam.data().buildings){
-            if(build instanceof UnitBuild unit && !production.containsKey(build)){
-                production.put(build, new float[]{unit.time, unit.progress});
-            }
-        }
-    }
-
-    private void freezeProduction(){
-        for(Building build : Vars.state.rules.waveTeam.data().buildings){
-            if(!(build instanceof UnitBuild unit)) continue;
-
-            float[] snapshot = production.get(build);
-            if(snapshot == null){
-                // 暂停期间才建起来的工厂（或第一次扫到），以当前进度为基准
-                production.put(build, new float[]{unit.time, unit.progress});
-            }else{
-                // 每帧写回意味着进度最多只多走一帧：若工厂刚好卡在最后一帧完工，
-                // 那一台单位仍会漏出来。要堵住得去读 UnitFactory 的 plan.time 留余量，
-                // 收益（最多漏一个单位）不值这个耦合，就先这样。
-                unit.time = snapshot[0];
-                unit.progress = snapshot[1];
-            }
         }
     }
 }
