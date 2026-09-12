@@ -1,97 +1,111 @@
-import arc.util.Interval;
-import arc.util.Log;
 import arc.util.Time;
 import mindustry.Vars;
-import mindustry.ai.BaseBuilderAI;
 import mindustry.core.GameState;
-import mindustry.game.Team;
-import mindustry.game.Teams.TeamData;
-
+import mindustry.game.MapObjectives;
+import mindustry.game.MapObjectives.TimerObjective;
 import java.lang.reflect.Field;
 
 /**
  * EnemyTimers 的离线验证：用真实游戏类构造最小环境，检查
- *   1. 反射能否拿到 BaseBuilderAI.timer / RtsAI.timer
- *   2. 暂停期间波次倒计时与 AI 计时器是否真的停住
- *   3. 恢复后 AI 计时器是否接着剩余时间走（而不是重新数满一轮）
+ *   1. 地图目标里的计时目标（TimerObjective）在暂停期间是否真的停住、且不会判定完成
+ *   2. 波次倒计时是否停住
+ *   3. 恢复后计时目标是否接着剩余时间走，而不是重新数满一轮
  *
  * 编译运行：
- *   javac -encoding UTF-8 -implicit:none -cp "Enemy Pause/libs/dependencies.jar;Enemy Pause/build/libs/EnemyPause.jar" -d out VerifyEnemyTimers.java
- *   java -Dfile.encoding=UTF-8 -cp "out;Enemy Pause/libs/dependencies.jar;Enemy Pause/build/libs/EnemyPause.jar" VerifyEnemyTimers
+ *   CP="Enemy Pause/libs/dependencies.jar;Enemy Pause/build/libs/EnemyPause.jar"
+ *   javac -encoding UTF-8 -implicit:none -sourcepath tools/epverify -cp "$CP" -d tools/epverify/out tools/epverify/VerifyEnemyTimers.java
+ *   java -Dfile.encoding=UTF-8 -cp "tools/epverify/out;$CP" VerifyEnemyTimers
  */
 public class VerifyEnemyTimers{
     static int failures = 0;
+    static Field countup;
 
     public static void main(String[] args) throws Exception{
-        // ---- 最小环境：只需要 Vars.state + 敌方 TeamData ----
+        countup = TimerObjective.class.getDeclaredField("countup");
+        countup.setAccessible(true);
+
+        // ---- 最小环境：只需要 Vars.state + 一条计时目标 ----
         Vars.state = new GameState();
         Vars.state.tick = 1000;
         Vars.state.wavetime = 600f;
+
+        // duration 单位是 tick（界面上乘 objectiveTimerMultiplier 后按秒显示）
+        TimerObjective timer = new TimerObjective("@objective.enemiesapproaching", 1800f);
+        Vars.state.rules.objectives = new MapObjectives();
+        Vars.state.rules.objectives.add(timer);
+
         Time.setInternalTime(1000f);
         Time.delta = 1f;
 
-        Team enemy = Vars.state.rules.waveTeam;
-        TeamData data = enemy.data();
-        data.buildAi = new BaseBuilderAI(data);
+        enemypause.EnemyTimers timers = new enemypause.EnemyTimers();
 
-        Interval aiTimer = timerOf(data.buildAi, "BaseBuilderAI");
-        check("反射拿到 BaseBuilderAI.timer", aiTimer != null);
-        if(aiTimer == null){
-            summary();
-            return;
+        // ---- 对照组：不暂停时计时目标会推进 ----
+        for(int i = 1; i <= 30; i++){
+            Time.setInternalTime(1000f + i);
+            timer.update();
         }
+        check("对照组：30 帧后 countup 推进到 30", countup(timer) == 30f);
 
-        // ---- 对照组：不暂停时 AI 计时器会正常触发 ----
-        aiTimer.get(0, 60f);              // 首次调用会重置时间戳
-        for(int i = 1; i <= 59; i++) Time.setInternalTime(1000f + i);
-        check("对照组：59 tick 时未触发", !aiTimer.get(0, 60f));
-        Time.setInternalTime(1000f + 60);
-        check("对照组：60 tick 时触发", aiTimer.get(0, 60f));
-
-        // 重新把 AI 计时器推到"已经等了 30 tick"的位置
-        Time.setInternalTime(2000f);
-        aiTimer.get(0, 60f);
-        for(int i = 1; i <= 30; i++) Time.setInternalTime(2000f + i);
+        // 回到"已推进 60 tick"的位置
+        setCountup(timer, 60f);
 
         // ---- 暂停 ----
-        enemypause.EnemyTimers timers = new enemypause.EnemyTimers();
+        Time.setInternalTime(2000f);
         timers.capture();
         check("capture 记录波次读数", Vars.state.wavetime == 600f);
+        check("capture 保留计时目标读数", countup(timer) == 60f);
 
-        boolean waveHeld = true, aiHeld = true;
-        // 模拟 600 帧：游戏每帧把倒计时减 1，然后 hold() 写回
-        for(int i = 31; i <= 630; i++){
+        boolean waveHeld = true, timerHeld = true, neverCompleted = true;
+        // 模拟 3000 帧：游戏每帧把两个倒计时都推进，然后 hold() 写回
+        for(int i = 1; i <= 3000; i++){
             Time.setInternalTime(2000f + i);
             Vars.state.tick += 1;
             Vars.state.wavetime -= 1f;
+            if(timer.update()) neverCompleted = false;
             timers.hold();
 
             if(Vars.state.wavetime != 600f) waveHeld = false;
-            if(aiTimer.get(0, 60f)) aiHeld = false;
+            if(countup(timer) != 60f) timerHeld = false;
         }
-        check("暂停 600 帧期间波次倒计时保持不动", waveHeld);
-        check("暂停 600 帧期间 AI 计时器未被触发", aiHeld);
-        check("暂停期间波次读数仍为 600", Vars.state.wavetime == 600f);
+        check("暂停 3000 帧期间波次倒计时保持不动", waveHeld);
+        check("暂停 3000 帧期间计时目标保持不动", timerHeld);
+        check("暂停期间计时目标从未判定完成", neverCompleted);
 
-        // ---- 恢复：AI 计时器应只剩 30 tick ----
+        // ---- 恢复后应接着剩余时间走 ----
         timers.release();
-        for(int i = 631; i <= 659; i++){
-            Time.setInternalTime(2000f + i);
-            if(aiTimer.get(0, 60f)){
-                check("恢复后剩余 29 tick 内不应触发", false);
-                break;
-            }
+        setCountup(timer, 60f);
+        Time.setInternalTime(6000f);
+        timer.update();     // 已经过 1 帧
+        check("恢复后计数从冻结处继续（61）", countup(timer) == 61f);
+
+        // ---- 逼近完成的边界：不能在暂停瞬间漏出去 ----
+        TimerObjective nearly = new TimerObjective("@objective.enemyescalating", 1800f);
+        Vars.state.rules.objectives = new MapObjectives();
+        Vars.state.rules.objectives.add(nearly);
+        setCountup(nearly, 1799.5f);
+
+        enemypause.EnemyTimers timers2 = new enemypause.EnemyTimers();
+        Time.setInternalTime(7000f);
+        timers2.capture();
+
+        boolean leaked = false;
+        for(int i = 1; i <= 600; i++){
+            Time.setInternalTime(7000f + i);
+            if(nearly.update()) leaked = true;
+            timers2.hold();
         }
-        Time.setInternalTime(2000f + 660);
-        check("恢复后在剩余 30 tick 处触发", aiTimer.get(0, 60f));
+        check("只剩 0.5 tick 时暂停：不会漏出完成判定", !leaked);
+        check("边界情况下读数被钳到阈值前 10 tick", countup(nearly) == 1790f);
 
         summary();
     }
 
-    static Interval timerOf(Object ai, String label) throws Exception{
-        Field f = ai.getClass().getDeclaredField("timer");
-        f.setAccessible(true);
-        return (Interval)f.get(ai);
+    static float countup(TimerObjective timer) throws Exception{
+        return countup.getFloat(timer);
+    }
+
+    static void setCountup(TimerObjective timer, float value) throws Exception{
+        countup.setFloat(timer, value);
     }
 
     static void check(String name, boolean ok){
