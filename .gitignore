@@ -1,3 +1,15 @@
+# 构建产物
 dist/
+**/build/
+**/.gradle/
 __pycache__/
 *.zip
+
+# 内置工具链（macOS 开发机用，体积很大，不参与版本管理）
+tools/jdk/
+tools/gradle-home/
+
+# 官方编译依赖（build.sh 缺失时自动下载，不纳入版本管理）
+Enemy Pause/libs/
+
+.DS_Store

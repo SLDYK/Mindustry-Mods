@@ -1,0 +1,23 @@
+# 游戏内显示的模组名
+displayName: "Enemy Pause"
+
+# 模组内部名（唯一标识；贴图引用也要用它作前缀）
+name: "enemy-pause"
+
+# 作者
+author: "SLDYK"
+
+# 主类的全限定名
+main: "enemypause.EnemyPauseMod"
+
+# 模组说明
+description: "战役模式下，按快捷键暂停 / 继续敌方下一波进攻的倒计时。"
+
+# 模组版本
+version: "0.1.0"
+
+# 能运行本模组的最低游戏版本
+minGameVersion: "159"
+
+# 标记为 Java 模组
+java: true

@@ -1,0 +1,8 @@
+build/
+.gradle/
+run/
+
+# 编译依赖，可按需重新下载（见根目录 README）
+libs/dependencies.jar
+
+.DS_Store

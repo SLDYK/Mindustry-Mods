@@ -1,21 +1,52 @@
 {
-    // Mindustry 模组开发工作区设置
-    "files.associations": {
-        "*.hjson": "hjson"
-    },
-    "files.eol": "\n",
-    "files.encoding": "utf8",
-    "files.exclude": {
-        "dist": true,
-        "**/__pycache__": true
-    },
-    "editor.insertSpaces": true,
-    "editor.tabSize": 4,
-    "[hjson]": {
-        "editor.formatOnSave": false
-    },
-    "search.exclude": {
-        "dist/**": true
-    },
-    "java.configuration.updateBuildConfiguration": "interactive"
+  // Mindustry 模组开发工作区设置（ra2-controls + Enemy Pause 合并后）
+  "files.associations": {
+    "*.hjson": "hjson"
+  },
+  "files.eol": "\n",
+  "files.encoding": "utf8",
+  "editor.insertSpaces": true,
+  "editor.tabSize": 4,
+  "[hjson]": {
+    "editor.formatOnSave": false
+  },
+
+  // 把工具链和构建产物从资源管理器里藏起来
+  "files.exclude": {
+    "dist": true,
+    "**/__pycache__": true,
+    "**/build": true,
+    "**/.gradle": true,
+    "**/tools/jdk": true,
+    "**/tools/gradle-home": true
+  },
+  "search.exclude": {
+    "dist/**": true,
+    "**/build/**": true,
+    "**/tools/jdk/**": true,
+    "**/tools/gradle-home/**": true
+  },
+
+  "java.configuration.updateBuildConfiguration": "interactive",
+  // 依赖未导入完成时不要直接报错
+  "java.errors.incompleteClasspath.severity": "warning",
+  "java.import.gradle.enabled": true,
+  "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx4G -Xms100m -Xlog:disable"
+
+  // ---- 以下设置只用于 macOS 开发机（绝对路径指向 Mac 上的内置 JDK）----
+  // 这里用绝对路径，因为语言服务器启动时对 ${workspaceFolder} 的替换并不可靠；
+  // 工作区在 Mac 上换位置的话需要同步改。Windows 上不需要这几项（走系统 JDK +
+  // 工程自带 gradle wrapper），回到 Mac 上开发时把下面几行取消注释即可。
+  //
+  // "java.jdt.ls.java.home": "/Volumes/ORICO/MugProjects/Mindustry/tools/jdk/Contents/Home",
+  // "java.import.gradle.java.home": "/Volumes/ORICO/MugProjects/Mindustry/tools/jdk/Contents/Home",
+  // "java.import.gradle.user.home": "/Volumes/ORICO/MugProjects/Mindustry/tools/gradle-home",
+  // "java.configuration.runtimes": [
+  //   {
+  //     "name": "JavaSE-21",
+  //     "path": "/Volumes/ORICO/MugProjects/Mindustry/tools/jdk/Contents/Home",
+  //     "default": true
+  //   }
+  // ],
 }
+
