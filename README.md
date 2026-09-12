@@ -54,16 +54,17 @@ tools\pack.ps1 -Install      # Windows 等价操作
 
 | 项目 | 值 |
 | --- | --- |
-| 游戏 | **Mindustry v159.7**（Steam 版，macOS arm64，内置 JRE 25） |
-| 游戏应用包 | `/Volumes/ORICO/SteamLibrary/steamapps/common/Mindustry/Mindustry.app` |
-| 真正生效的数据目录 | `Mindustry.app/Contents/Resources/saves/`（判断依据：里面有 `settings.bin`） |
-| 编译用 JDK | `tools/jdk` — Temurin **21.0.12.1**（独立安装） |
+| 游戏 | **Mindustry v160.1**（Steam 版，内置 JRE 25） |
+| 游戏目录（Windows） | `E:\SteamLibrary\steamapps\common\Mindustry`，数据目录就是游戏目录下的 `saves\`（mods 在 `saves\mods`） |
+| 游戏应用包（macOS） | `/Volumes/ORICO/SteamLibrary/steamapps/common/Mindustry/Mindustry.app` |
+| 真正生效的数据目录 | Windows：游戏目录下的 `saves\`；macOS：`Mindustry.app/Contents/Resources/saves/`（判断依据：里面有 `settings.bin`） |
+| 编译用 JDK | macOS：`tools/jdk` — Temurin **21.0.12.1**；Windows：系统 JDK 21（`D:\OpenJDK`） |
 | Gradle | **9.4.1**，分发包缓存在 `tools/gradle-home`，首次下完即离线可用 |
-| 编译依赖 | `Enemy Pause/libs/dependencies.jar` — 官方 v159.7 版，15 MB |
+| 编译依赖 | `Enemy Pause/libs/dependencies.jar` — 官方 v160.1 版，15 MB |
 | 模组项目 | `Enemy Pause/` |
 
-> 游戏自带的 `jre` 是精简过的运行时，里面只有 `java` 没有 `javac`，所以编译必须用 `tools/jdk`。
-> v159.7 的类文件是 Java 17，所以源码编译目标也是 `--release 17`。
+> 游戏自带的 `jre` 是精简过的运行时，里面只有 `java` 没有 `javac`，所以编译必须另用 JDK。
+> v160.1 的类文件是 Java 17，所以源码编译目标也是 `--release 17`。
 
 ### Enemy Pause 模组
 
@@ -140,6 +141,18 @@ Enemy Pause/             模组项目（见下）
 ./run.sh                    # 编译 + 部署 + 启动游戏 + tail 日志（一条龙开发循环）
 ```
 
+Windows 侧（本机游戏目录 `E:\SteamLibrary\steamapps\common\Mindustry`）没有对应的 shell 脚本，
+直接用 gradle + 复制两步：
+
+```powershell
+cd "Enemy Pause"
+$env:GRADLE_USER_HOME = "$PWD\..\tools\gradle-home"   # 缓存不写 ~/.gradle
+.\gradlew.bat jar --offline
+Copy-Item build\libs\EnemyPause.jar "E:\SteamLibrary\steamapps\common\Mindustry\saves\mods\" -Force
+```
+
+> 模组只在游戏启动时加载，换 jar 后必须重启游戏。
+
 在 VS Code 里：`Cmd+Shift+B` 触发默认构建任务；`Cmd+Shift+P` → `Tasks: Run Task` 里还有
 「Mindustry: 构建并部署」和「Mindustry: 校验产物」。
 
@@ -150,12 +163,29 @@ Enemy Pause/             模组项目（见下）
 3. 语言包放在 jar 内的 `bundles/` 目录下（放到根目录会静默失效，见下文）
 4. 代码里以模组内部名为前缀的文案键（如 `enemy-pause.paused`）都在语言包里定义了
 
+另有 `tools/epverify`：针对 `EnemyTimers` 的离线验证，用真实游戏类构造最小环境（`Vars.state` + 敌方
+`TeamData`），校验三件事，不用启动游戏：
+
+1. 反射能拿到 `BaseBuilderAI.timer` / `RtsAI.timer`
+2. 暂停期间波次倒计时与 AI 计时器是否真的停住（含对照组：不暂停时 60 tick 会正常触发）
+3. 恢复后 AI 计时器是否接着剩余时间走，而不是重新数满一轮
+
+```bash
+CP="Enemy Pause/libs/dependencies.jar:Enemy Pause/build/libs/EnemyPause.jar"   # Windows 下分隔符改成 ;
+javac -encoding UTF-8 -implicit:none -sourcepath tools/epverify -cp "$CP" \
+  -d tools/epverify/out tools/epverify/VerifyEnemyTimers.java
+java -Dfile.encoding=UTF-8 -cp "tools/epverify/out:$CP" VerifyEnemyTimers
+```
+
+> `-sourcepath` 必须显式指定：`dependencies.jar` 里同时打包了 `.java` 源码，
+> 不指定的话 javac 会去隐式编译那些源码，报一堆找不到符号。
+
 ### 模组项目结构（`Enemy Pause/`）
 
 ```
 build.gradle            构建脚本：本地 jar 依赖优先，离线即可编译
 settings.gradle         项目名 EnemyPause（目录名有空格，产物名不能带空格）
-gradle.properties       目标游戏版本 mindustryVersion=v159.7（脚本共用）
+gradle.properties       目标游戏版本 mindustryVersion=v160.1（脚本共用）
 mod.hjson               模组元数据，必须打进 jar 根目录
 src/enemypause/
     EnemyPauseMod.java      入口：注册按键、挂事件监听
