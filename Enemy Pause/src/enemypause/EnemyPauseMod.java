@@ -12,7 +12,10 @@ import mindustry.mod.Mod;
 /**
  * Enemy Pause 模组入口。
  *
- * 功能：战役模式下按一个键，暂停 / 继续"下一波敌方进攻"的倒计时。
+ * 功能：战役模式下按一个键，暂停 / 继续敌方侧的各种倒计时——下一波进攻、
+ * 敌方基地扩建与部队调度、敌方工厂的激活与生产。
+ *
+ * 冻结的细节见 EnemyTimers，状态机见 EnemyPause。
  */
 public class EnemyPauseMod extends Mod{
 
@@ -30,7 +33,7 @@ public class EnemyPauseMod extends Mod{
      */
     public static final KeyCode DEFAULT_KEY = KeyCode.y;
 
-    private final EnemyWavePause wavePause = new EnemyWavePause();
+    private final EnemyPause pause = new EnemyPause();
     private KeyBind toggleBind;
 
     @Override
@@ -53,9 +56,9 @@ public class EnemyPauseMod extends Mod{
         // 用 Events.run 而不是 Events.on：Trigger 是个枚举，注册用的"键"就是枚举常量本身。
         Events.run(Trigger.update, this::pollKey);
 
-        // afterGameUpdate 紧跟在倒计时递减和 runWave() 判断之后，
-        // 只有在这个时机写回 state.wavetime 才真的按得住倒计时。
-        Events.run(Trigger.afterGameUpdate, wavePause::update);
+        // afterGameUpdate 在倒计时递减、runWave() 判断、敌方 AI 与建筑这一帧的更新之后触发，
+        // 只有在这个时机写回读数才真的按得住敌方倒计时。
+        Events.run(Trigger.afterGameUpdate, pause::update);
 
         Log.info("[enemy-pause] loaded. Default key: " + DEFAULT_KEY.name()
             + " (rebindable in Settings -> Keybinds).");
@@ -63,7 +66,7 @@ public class EnemyPauseMod extends Mod{
 
     private void pollKey(){
         if(toggleBind != null && Core.input != null && Core.input.keyTap(toggleBind)){
-            wavePause.toggle();
+            pause.toggle();
         }
     }
 }

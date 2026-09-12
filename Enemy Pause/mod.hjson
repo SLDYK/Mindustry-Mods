@@ -11,13 +11,13 @@ author: "SLDYK"
 main: "enemypause.EnemyPauseMod"
 
 # 模组说明
-description: "战役模式下，按快捷键暂停 / 继续敌方下一波进攻的倒计时。"
+description: "战役模式下，按快捷键暂停 / 继续敌方侧的各种倒计时：下一波进攻、基地扩建与部队调度、工厂的激活与生产。"
 
 # 模组版本
-version: "0.1.0"
+version: "0.2.0"
 
-# 能运行本模组的最低游戏版本
-minGameVersion: "159"
+# 能运行本模组的最低游戏版本（在 160.1 上实测）
+minGameVersion: "160"
 
 # 标记为 Java 模组
 java: true

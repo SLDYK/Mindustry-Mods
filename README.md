@@ -5,7 +5,7 @@
 | 模组 | 目录 | 说明 | 主要开发机 |
 |------|------|------|------------|
 | **ra2-controls** | `ra2-controls/` | RA2 风格指挥操作 Java 模组，见 `RA2-CONTROLS.md` / `PLAN.md` / `ra2-controls/README.md` | Windows |
-| **Enemy Pause** | `Enemy Pause/` | 战役模式下按键暂停 / 继续敌方下一波进攻倒计时，见下文 | macOS |
+| **Enemy Pause** | `Enemy Pause/` | 战役模式下按键暂停 / 继续敌方侧的各种倒计时（进攻 / 扩建 / 生产），见下文 | macOS |
 
 两个模组相互独立（各自的 gradle 工程、各自的构建脚本），互不影响：
 
@@ -67,18 +67,27 @@ tools\pack.ps1 -Install      # Windows 等价操作
 
 ### Enemy Pause 模组
 
-`Enemy Pause/` 里的模组只做一件事：**战役模式下按一个键，暂停 / 继续敌方下一波进攻的倒计时。**
+`Enemy Pause/` 里的模组做一件事：**战役模式下按一个键，暂停 / 继续敌方侧的各种倒计时。**
 
 | 项 | 值 |
 | --- | --- |
 | 默认按键 | **Y**（在 设置 → 按键 的「常规」分组里可改） |
-| 生效范围 | 只在战役模式（判据 `state.rules.sector != null`），且只对单机有效 |
+| 生效范围 | 只在战役模式，且只对单机有效；`rules.waves` 或 `rules.attackMode` 至少开着一个 |
 | 游戏内反馈 | 暂停 / 继续时屏幕下方弹一条提示 |
 
 之所以选 `Y`：Mindustry 自带的绑定已经占掉了 a~z 里除 `i k l o u y` 以外的所有字母，
 其中语义最贴近的 `p`（地图标记 ping）和空格（游戏暂停）都被占了。
 
-**原理**：游戏在 `Logic.update()` 里这样推进倒计时
+#### 冻结哪些倒计时
+
+| # | 倒计时 | 游戏里的数据 | 冻结方式 |
+| --- | --- | --- | --- |
+| 1 | 下一波进攻 | `state.wavetime` | 每帧写回暂停时的读数 |
+| 2 | 敌方基地扩建、部队调度 | `BaseBuilderAI.timer` / `RtsAI.timer`（`arc.util.Interval`） | 每帧把各槽位时间戳归到 `Time.time`，年龄恒为 0 |
+| 3 | 敌方工厂激活 | `TeamRule.unitFactoryActivationDelay`（判据是 `state.tick >= 延迟`） | 反着把延迟往后推同样的 tick 数 |
+| 4 | 敌方工厂生产进度 | 敌方 `UnitBuild.time` / `progress` | 每帧写回暂停时的进度 |
+
+第 1 项的时机：游戏在 `Logic.update()` 里这样推进倒计时
 
 ```java
 if(rules.waves && rules.waveTimer && !state.gameOver && !isWaitingWave())
@@ -87,17 +96,25 @@ if(!net.client() && state.wavetime <= 0 && rules.waves)
     runWave();
 ```
 
-模组把逻辑挂在 `Trigger.afterGameUpdate` 上——这个时机正好在这两步**之后**触发，
-暂停期间把 `state.wavetime` 写回冻结值即可：倒计时既不前进，也不会满足 `<= 0` 发起进攻。
+模组把逻辑挂在 `Trigger.afterGameUpdate` 上——这个时机在**上面两步、以及敌方 AI 与建筑的这一帧更新之后**触发，
+所以每帧写回读数就等于把这一帧的时间推进抹掉。
 
 几个细节：
 
-- 冻结值最少保留 10 tick（1/6 秒）。否则在倒计时只剩最后一两帧时按暂停，下一帧扣掉
+- 波次冻结值最少保留 10 tick（1/6 秒）。否则在倒计时只剩最后一两帧时按暂停，下一帧扣掉
   `Time.delta` 就归零了，`runWave()` 仍会把这一波放出来，暂停形同失效。
   代价是恢复后最多差 0.17 秒，察觉不到。
-- 换地图 / 退出战役 / 游戏结束 / 期间放出去过一波（比如点了 HUD 的提前进攻），
-  暂停会自动解除，不会残留到下一局。
-- 多人游戏无效：`state.wavetime` 由服务端说了算，客户端改写会被同步覆盖。
+- 第 2 项的 `timer` 字段是包级私有、没有 getter，只能反射拿（`Interval.getTimes()` 则是公开的，不用再反射）。
+- 第 2 项**不能**写成 `times[id] += Time.delta`：帧率一抖动，时间戳就会被写到 `Time.time` 之后，
+  而 `Interval.check()` 的 `Time.time < times[id]` 分支恰好把「时间戳在未来」当成「该触发了」，会反过来让 AI 乱触发。
+- 第 3 项只在敌方工厂**还没**激活时推后；已经激活的再推反而会把工厂关回去。
+- 第 4 项每帧写回意味着进度最多多走一帧，若工厂刚好卡在最后一帧完工，那一台仍会漏出来。
+- **不覆盖**已经在场上的敌方单位（冻住它们等于把敌人本身定住，是另一个需求），也不覆盖
+  行星图上「敌方入侵已占领星区」的回合倒计时。
+- 换地图 / 退出战役 / 游戏结束 / 玩法状态变了（`waves`、`attackMode` 都关掉）/ 期间放出去过一波
+  （比如点了 HUD 的提前进攻），暂停会自动解除，不会残留到下一局。
+- 手动继续时会把第 2 项的剩余时间还原，所以反复暂停不会让敌方 AI 每次都重新数满一轮。
+- 多人游戏无效：这些状态都由服务端说了算，客户端改写会被同步覆盖。
 
 ### 目录结构
 
@@ -142,7 +159,8 @@ gradle.properties       目标游戏版本 mindustryVersion=v159.7（脚本共�
 mod.hjson               模组元数据，必须打进 jar 根目录
 src/enemypause/
     EnemyPauseMod.java      入口：注册按键、挂事件监听
-    EnemyWavePause.java     倒计时冻结逻辑
+    EnemyPause.java         暂停状态机：生效范围判定、自动解除
+    EnemyTimers.java        四类敌方倒计时的冻结 / 还原
 assets/sprites/*.png    贴图；源码路径 assets/sprites/foo.png 会变成 jar 内的 sprites/foo.png
 bundles/
     bundle.properties       默认（英文）语言包
@@ -199,8 +217,9 @@ build/libs/EnemyPause.jar   构建产物
 
 1. `./run.sh`（构建 + 部署 + 启动游戏 + 跟日志）
 2. 开一局**战役**地图，日志里应出现 `Loaded mod 'enemy-pause'`
-3. 按 `Y`：倒计时停住并弹出「敌方进攻倒计时已暂停」；再按 `Y` 继续，弹出「…已继续」
-4. 看倒计时有没有真的停住——打不开游戏时用 `./check.sh` 先排掉打包/元数据问题
+3. 按 `Y`：弹出「敌方倒计时已暂停（进攻 / 扩建 / 生产）」；再按 `Y` 弹出「敌方倒计时已继续」
+4. 看倒计时有没有真的停住：波次读数应定住不动；有敌方核心的图可以看敌方是否停止扩建/出单位
+   ——打不开游戏时用 `./check.sh` 先排掉打包/元数据问题
 
 ### 注意事项
 

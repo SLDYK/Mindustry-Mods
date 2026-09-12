@@ -16,6 +16,9 @@ __pycache__/
 tools/jdk/
 tools/gradle-home/
 
+# 验证工具的编译产物
+tools/epverify/out/
+
 # 官方编译依赖（build.sh 缺失时自动下载，不纳入版本管理）
 Enemy Pause/libs/
 
