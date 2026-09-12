@@ -86,39 +86,59 @@ tools\pack.ps1 -Install      # Windows 等价操作
 
 | # | 倒计时 | 游戏里的数据 | 冻结方式 |
 | --- | --- | --- | --- |
-| 1 | 下一波进攻（界面上那个「敌人来袭 x:xx」） | `state.wavetime` | 每帧写回暂停时的读数 |
-| 2 | 敌方基地扩建、部队调度（基地 AI 启动新一批行为的间隔） | `BaseBuilderAI.timer` / `RtsAI.timer`（`arc.util.Interval`） | 每帧把各槽位时间戳归到 `Time.time`，年龄恒为 0 |
+| 1 | 下一波进攻（HUD 上的波次倒计时） | `state.wavetime` | 每帧写回暂停时的读数 |
+| 2 | **地图目标里的计时目标**，例如「敌人来袭：9:35」「敌方在 N 后扩大单位生产」 | `MapObjectives.TimerObjective.countup` | 每帧写回暂停时的读数（反射，`countup` 是 protected） |
+
+> 第 2 项是最初漏掉的那一个：截图里那个「敌人来袭」**不是**波次倒计时。
+> 那几条文案（`objective.enemiesapproaching` / `objective.enemyescalating` 等）是**由关卡地图数据**
+> 以 `@objective.enemiesapproaching` 的形式引用的，Java 代码里搜不到字面量，所以按代码搜索会完全找不到。
+
+`TimerObjective` 的推进与完成判定（`MapObjectives` 内部类）：
+
+```java
+public boolean update(){
+    return (countup += Time.delta) >= duration * state.rules.objectiveTimerMultiplier;
+}
+// 界面显示的 = duration * 倍率 - countup，格式化成 MM:SS
+int i = (int)((duration * state.rules.objectiveTimerMultiplier - countup) / 60f);
+```
 
 第 1 项的时机：游戏在 `Logic.update()` 里这样推进倒计时
 
 ```java
-if(rules.waves && rules.waveTimer && !state.gameOver && !isWaitingWave())
-    state.wavetime = Math.max(state.wavetime - Time.delta, 0);
-if(!net.client() && state.wavetime <= 0 && rules.waves)
-    runWave();
+if(!state.isEditor()) state.rules.objectives.update();   // ← 第 2 项在这里推进
+
+if(state.rules.waves && state.rules.waveTimer && !state.gameOver){
+    if(!isWaitingWave()) state.wavetime = Math.max(state.wavetime - Time.delta, 0);
+}
+if(!net.client() && state.wavetime <= 0 && state.rules.waves) runWave();
+
+updateEntities();
+Events.fire(Trigger.afterGameUpdate);                    // ← 模组的写回挂在这里
 ```
 
-模组把逻辑挂在 `Trigger.afterGameUpdate` 上——这个时机在**上面两步、以及敌方 AI 这一帧的更新之后**触发，
-所以每帧写回读数就等于把这一帧的时间推进抹掉。
+两项都在 `Trigger.afterGameUpdate` **之前**推进，所以每帧写回读数就等于把这一帧的时间推进抹掉。
 
 几个细节：
 
-- 波次冻结值最少保留 10 tick（1/6 秒）。否则在倒计时只剩最后一两帧时按暂停，下一帧扣掉
-  `Time.delta` 就归零了，`runWave()` 仍会把这一波放出来，暂停形同失效。
-  代价是恢复后最多差 0.17 秒，察觉不到。
-- 第 2 项的 `timer` 字段是包级私有、没有 getter，只能反射拿（`Interval.getTimes()` 则是公开的，不用再反射）。
-- 第 2 项**不能**写成 `times[id] += Time.delta`：帧率一抖动，时间戳就会被写到 `Time.time` 之后，
-  而 `Interval.check()` 的 `Time.time < times[id]` 分支恰好把「时间戳在未来」当成「该触发了」，会反过来让 AI 乱触发。
-- 第 2 项冻的是「AI 多久想一次事」，所以敌方不会启动新的扩建批次 / 新的部队调度；
-  但已经在场的单位照常打，工厂也照常在造。
-- **不覆盖**已经在场上的敌方单位，也不覆盖行星图上「敌方入侵已占领星区」的回合倒计时。
+- 两项的冻结值都最少保留 10 tick（1/6 秒）。**这个边界保护对第 2 项尤其关键**：两项都是
+  「够到阈值就触发」，而触发判定在每帧推进里、比我们的写回更早。若在只剩最后一两帧时按暂停，
+  原样冻结的话那次判定仍会通过——波次是 `runWave()` 把这一波放出来，计时目标则是**直接判定完成
+  并触发后果**（比如敌人真的开始进攻）。抬到 1/6 秒堵住这个缺口，代价是恢复后最多差 0.17 秒。
+  （`Time.delta` 上限是 3，所以 10 tick 有 3 帧余量。）
+- 第 2 项的 `countup` 是 `protected`，模组和它不同包，只能反射。取不到时只放弃这一项，
+  波次倒计时照常工作（启动日志里会有 warn）。
+- 计时目标可以挂在别的目标下面（`MapObjective.parents`），父目标没完成前它根本不参与更新，
+  所以不能只在按 Y 的瞬间扫一遍——每帧都要补记新出现的计时目标。
 - 换地图 / 退出战役 / 游戏结束 / 玩法状态变了（`waves`、`attackMode` 都关掉）/ 期间放出去过一波
   （比如点了 HUD 的提前进攻），暂停会自动解除，不会残留到下一局。
-- 手动继续时会把第 2 项的剩余时间还原，所以反复暂停不会让敌方 AI 每次都重新数满一轮。
+- 恢复时不需要「还原」：两个读数一直停在冻结值上，游戏自己会从那里接着加。
 - 多人游戏无效：这些状态都由服务端说了算，客户端改写会被同步覆盖。
+- **不覆盖**：已经在场上的敌方单位、敌方工厂生产与激活、敌方基地 AI 的扩建/调度节奏，
+  以及行星图上「敌方入侵已占领星区」的回合倒计时。
 
-> 早先版本还冻过「敌方工厂激活倒计时」和「敌方工厂生产进度」。那两项表现为敌人的**生产行为**
-> 被卡住，与「只暂停倒计时」的定位不符，已移除。
+> 演进记录：v0.1 只冻波次；v0.2 误把「敌方行为」也冻了（工厂激活、生产进度、基地 AI 计时器）；
+> v0.3 按需求移除行为类；v0.4 才找到真正该冻的第 2 项——地图目标里的计时目标。
 
 ### 目录结构
 
