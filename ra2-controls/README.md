@@ -4,26 +4,37 @@ Mindustry 桌面端 RA2 风格指挥操作模组。当前进度见 `../PLAN.md`�
 
 ## 构建
 
-需要 JDK 17+（本机 21 可用）。本模组以本机 Steam 版 `desktop.jar` 为编译基准（v8 / 159.7）。
+需要 JDK 17+。本模组以本机 Steam 版 `desktop.jar` 为编译基准（v8 / 159.7），构建时自动跨平台探测：
+
+- **macOS**：`Mindustry.app/Contents/Resources/desktop.jar`（含外置盘 Steam 库）
+- **Windows**：`{C,D,E}:/...SteamLibrary/steamapps/common/Mindustry/jre/desktop.jar`
+- **Linux**：`~/.steam/steam/...` 或 `~/.local/share/Steam/...`
+
+找不到时设环境变量 `MINDUSTRY_JAR` 指向 `desktop.jar` 即可。
 
 ```
 cd ra2-controls
-.\gradlew.bat jar        # 输出 build/libs/ra2-controls.jar
-.\gradlew.bat installMod # 构建并复制到 %APPDATA%\Mindustry\mods\
+./gradlew jar          # macOS/Linux；Windows 用 gradlew.bat
+./gradlew installMod   # 构建并复制到 mods 目录
 ```
 
-若游戏 jar 不在默认位置，设环境变量 `MINDUSTRY_JAR` 指向 `desktop.jar`。
+或直接用根目录脚本 / VS Code 任务（任务已跨平台，Windows 自动走 pack.ps1）：
+
+```
+./tools/pack.sh              # 构建
+./tools/pack.sh --install    # 构建并安装
+./tools/pack.sh --zip        # 构建并输出 zip 到 dist/
+```
 
 ## 安装
 
-运行 `gradlew.bat installMod`，或用工作区任务「RA2: 打包并安装」。
+模组安装目录（自动探测）：
 
-## 已实现（P2 第二批：快捷键）
+- **macOS（Steam 版）**：`~/Library/Application Support/Mindustry/mods/`
+- **Windows（Steam 版）**：游戏目录 `saves/mods/`
+- 其它：`%APPDATA%/Mindustry/mods/`
 
-- **F → 停止**：清空所选单位全部指令，原地待命（仍自动还击射程内敌人；走 `UnitStance.stop`，即 RA2 的 S 因 WASD 占用改到 F——原版 H 被"选中全部单位工厂"占用）
-- **X → 散开**：所选单位各自向自身周围 4~10 格随机点移动（纯输入层，阵型由原版分配）
-- **Home → 回核心**：镜头一次性跳回最近核心（走原版 `panCamera`，不改跟随机制）
-- **以上键位全部可配置**：注册为自定义 KeyBind，在 **设置→控制→RA2 指令** 分组中改绑/重置；指挥模式切换键本身是原版键位（默认左 Ctrl，不强制修改，同样可改绑）
+运行 `./gradlew installMod`，或用工作区任务「RA2: 构建并安装」。
 
 ## 已实现（P2 第一批）
 
@@ -32,15 +43,16 @@ cd ra2-controls
 - **左键单击空地/敌人（有选择时）→ 下令**：移动 / 攻击（原版右键下令翻转为左键）
 - **右键单击 → 清空全部选择**（原版右键下令被拦截；右键拖拽无操作）
 - **指挥模式进入方式强制为切换**（原版"按住"设置 `commandmodehold` 由模组托管，改回会被自动翻回；卸载模组后可在 设置→游戏 手动改回）
-- **指挥模式切换键默认改绑为 Tab**（原版默认左 Ctrl；首次启用一次性迁移，之后手动改绑不被覆盖）
+- **原版指挥专属键全部解除绑定**：select_all_units(G)、select_all_unit_factories(H)、select_all_unit_transport、command_queue(鼠标中键) 安装时 unset——指挥操作 100% 由模组键位定义；想找回某项原版功能可在 设置→控制 重新设键
+- 指挥模式切换键保持原版默认（左 Ctrl），可在 设置→控制 自行改绑（如 Tab）；模组不强制修改
 - 编队 Ctrl+0-9 / 0-9 / 双击居中、Shift 框选并入、双击同类全选：沿用原版逻辑不改（Shift 单击/框选均为加选语义）
 
 对应规范：`../RA2-CONTROLS.md` §2、§3（第一个操作=§2 左键替换选择 / 右键清空）。
 
 ## 尚未实现（后续里程碑）
 
-- G 攻击移动、H 停止、X 散开、Home 回核心（P2 后续）
-- Ctrl 框选剔除、三击全图同类
+- G 攻击移动（Tier A 近似：移动 + pursueTarget stance；Tier B 真追击）
 - Z+左键可视化路径点（RA2 原版键位）
-- 设置界面与键位改绑
-- Tier B 攻击移动真追击（AttackMoveCommand / ChaseReturnAI）
+- T 选择同类按键触发（双击已等价）、Ctrl 框选剔除、三击全图同类
+- 设置界面（逐项开关 + 一键还原原版）
+- Tier B 内容层（AttackMoveCommand / ChaseReturnAI）、联机双端测试

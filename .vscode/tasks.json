@@ -1,69 +1,54 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    // ---- Windows：ra2-controls ----
-    {
-      "label": "RA2: 构建并安装 (ra2-controls)",
-      "type": "shell",
-      "command": "powershell",
-      "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/pack.ps1", "-Install"],
-      "problemMatcher": [],
-      "presentation": { "reveal": "always" }
-    },
-    {
-      "label": "RA2: 构建 (ra2-controls)",
-      "type": "shell",
-      "command": "powershell",
-      "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/pack.ps1"],
-      "problemMatcher": [],
-      "presentation": { "reveal": "always" }
-    },
-    // ---- macOS：Enemy Pause ----
-    {
-      "label": "Mindustry: 构建模组",
-      "type": "shell",
-      "command": "\"${workspaceFolder}/build.sh\"",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
-      "problemMatcher": ["$javac"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
-    },
-    {
-      "label": "Mindustry: 构建并部署",
-      "type": "shell",
-      "command": "\"${workspaceFolder}/build.sh\" && \"${workspaceFolder}/deploy.sh\"",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": ["$javac"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
-    },
-    {
-      "label": "Mindustry: 校验产物",
-      "type": "shell",
-      "command": "\"${workspaceFolder}/check.sh\"",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
-    }
-  ]
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "RA2: 构建并安装 (ra2-controls)",
+            "type": "shell",
+            "command": "bash",
+            "args": ["${workspaceFolder}/tools/pack.sh", "--install"],
+            "problemMatcher": [],
+            "presentation": { "reveal": "always" },
+            "windows": {
+                "command": "powershell",
+                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/pack.ps1", "-Install"]
+            }
+        },
+        {
+            "label": "RA2: 构建 (ra2-controls)",
+            "type": "shell",
+            "command": "bash",
+            "args": ["${workspaceFolder}/tools/pack.sh"],
+            "problemMatcher": [],
+            "presentation": { "reveal": "always" },
+            "windows": {
+                "command": "powershell",
+                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/pack.ps1"]
+            }
+        },
+        // ---- Enemy Pause（macOS：依赖 build.sh 等脚本与 tools/jdk 内置工具链）----
+        {
+            "label": "Mindustry: 构建模组",
+            "type": "shell",
+            "command": "\"${workspaceFolder}/build.sh\"",
+            "options": { "cwd": "${workspaceFolder}" },
+            "group": { "kind": "build", "isDefault": true },
+            "problemMatcher": ["$javac"],
+            "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+        },
+        {
+            "label": "Mindustry: 构建并部署",
+            "type": "shell",
+            "command": "\"${workspaceFolder}/build.sh\" && \"${workspaceFolder}/deploy.sh\"",
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": ["$javac"],
+            "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+        },
+        {
+            "label": "Mindustry: 校验产物",
+            "type": "shell",
+            "command": "\"${workspaceFolder}/check.sh\"",
+            "options": { "cwd": "${workspaceFolder}" },
+            "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+        }
+    ]
 }
-

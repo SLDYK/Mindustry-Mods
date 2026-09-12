@@ -1,9 +1,16 @@
 # 构建产物
 dist/
+build/
+.gradle/
 **/build/
 **/.gradle/
 __pycache__/
 *.zip
+
+# IDE
+.idea/
+*.iml
+.vscode/ipch/
 
 # 内置工具链（macOS 开发机用，体积很大，不参与版本管理）
 tools/jdk/
