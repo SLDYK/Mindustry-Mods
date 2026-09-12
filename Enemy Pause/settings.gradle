@@ -1,0 +1,2 @@
+// 目录名带空格，这里显式指定项目名，避免产物叫 "Enemy Pause.jar"
+rootProject.name = "EnemyPause"

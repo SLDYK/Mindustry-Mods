@@ -1,0 +1,35 @@
+{
+  // 这里用绝对路径，因为语言服务器启动时对 ${workspaceFolder} 的替换并不可靠。
+  // 工作区换位置的话，需要同步改这个文件。
+
+  // 语言服务器 + Gradle 导入都走内置 JDK，不碰系统里那套 Java
+  "java.jdt.ls.java.home": "/Volumes/ORICO/MugProjects/Mindustry/tools/jdk/Contents/Home",
+  "java.import.gradle.enabled": true,
+  "java.import.gradle.java.home": "/Volumes/ORICO/MugProjects/Mindustry/tools/jdk/Contents/Home",
+  "java.import.gradle.user.home": "/Volumes/ORICO/MugProjects/Mindustry/tools/gradle-home",
+
+  "java.configuration.runtimes": [
+    {
+      "name": "JavaSE-21",
+      "path": "/Volumes/ORICO/MugProjects/Mindustry/tools/jdk/Contents/Home",
+      "default": true
+    }
+  ],
+
+  // 依赖未导入完成时不要直接报错
+  "java.errors.incompleteClasspath.severity": "warning",
+
+  // 把工具链和构建产物从资源管理器里藏起来
+  "files.exclude": {
+    "**/tools/jdk": true,
+    "**/tools/gradle-home": true,
+    "**/build": true,
+    "**/.gradle": true
+  },
+  "search.exclude": {
+    "**/tools/**": true,
+    "**/build/**": true
+  },
+  "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx4G -Xms100m -Xlog:disable",
+  "java.configuration.updateBuildConfiguration": "interactive"
+}

@@ -1,0 +1,12 @@
+# 内置工具链（不参与版本管理，体积很大）
+tools/jdk/
+tools/gradle-home/
+
+# 构建产物
+**/build/
+**/.gradle/
+
+# 官方编译依赖（build.sh 缺失时自动下载，不纳入版本管理）
+Enemy Pause/libs/
+
+.DS_Store
