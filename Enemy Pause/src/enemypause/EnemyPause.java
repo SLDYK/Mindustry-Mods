@@ -6,9 +6,9 @@ import mindustry.core.GameState;
 import mindustry.maps.Map;
 
 /**
- * 暂停状态机：管 Y 键的开关、生效范围判定，以及"局面变了就自动解除"。
+ * 暂停状态机：管 Y 键的开关、U 键的跳过、生效范围判定，以及"局面变了就自动解除"。
  *
- * 真正冻住哪些倒计时见 EnemyTimers。
+ * 真正冻住哪些倒计时见 EnemyTimers，跳过逻辑见 EnemySkip。
  *
  * 这里冻的是倒计时本身（波次 + 地图目标里的计时目标），不是敌人的行为：
  * 已经在场的敌方单位照常行动开火，工厂照常生产，基地 AI 也照常扩建。
@@ -54,6 +54,21 @@ public class EnemyPause{
         timers.capture();
 
         toast("enemy-pause.paused");
+    }
+
+    /**
+     * 跳过当前正在走的倒计时：直接推到终点，让后果立刻发生（波次立刻出兵、目标计时立刻判定完成）。
+     * 由 U 键调用——暂停与否都能用。
+     */
+    public void skip(){
+        // 需求：跳过之后不再保持暂停，按「自动解除」处理。
+        // 不还原读数——局面已经变了，让敌方节奏重新数才是对的。
+        if(paused){
+            release(false);
+        }
+
+        boolean any = EnemySkip.all();
+        toast(any ? "enemy-pause.skipped" : "enemy-pause.skip.none");
     }
 
     /**

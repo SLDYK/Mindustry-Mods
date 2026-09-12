@@ -12,16 +12,22 @@ import mindustry.mod.Mod;
 /**
  * Enemy Pause 模组入口。
  *
- * 功能：战役模式下按一个键，暂停 / 继续敌方侧的倒计时——
- * 下一波进攻，以及地图目标里那些计时目标（如「敌人来袭：9:35」）。
+ * 功能（战役模式下）：
+ *   Y  暂停 / 继续敌方侧的倒计时——下一波进攻，以及地图目标里那些计时目标
+ *      （如「敌人来袭：9:35」）
+ *   U  跳过本轮倒计时：直接推到终点，让后果立刻发生（波次立刻出兵、
+ *      目标计时立刻判定完成）
  *
  * 冻的只是倒计时，不是敌人本身：已在场单位照常行动，工厂照常生产。
- * 细节见 EnemyTimers，状态机见 EnemyPause。
+ * 细节见 EnemyTimers / EnemySkip，状态机见 EnemyPause。
  */
 public class EnemyPauseMod extends Mod{
 
-    /** 按键标识：同时用于存设置，以及拼出翻译键 keybind.enemy_pause.name。 */
+    /** 暂停键标识：同时用于存设置，以及拼出翻译键 keybind.enemy_pause.name。 */
     public static final String BIND_NAME = "enemy_pause";
+
+    /** 跳过键标识，拼出 keybind.enemy_pause_skip.name。 */
+    public static final String SKIP_BIND_NAME = "enemy_pause_skip";
 
     /** 复用游戏自带的 general 分类，设置界面里会显示已翻译好的"常规"。 */
     public static final String BIND_CATEGORY = "general";
@@ -34,8 +40,11 @@ public class EnemyPauseMod extends Mod{
      */
     public static final KeyCode DEFAULT_KEY = KeyCode.y;
 
+    /** 跳过键默认绑定 u——和 y 同一批剩下的字母。 */
+    public static final KeyCode DEFAULT_SKIP_KEY = KeyCode.u;
+
     private final EnemyPause pause = new EnemyPause();
-    private KeyBind toggleBind;
+    private KeyBind toggleBind, skipBind;
 
     @Override
     public void init(){
@@ -43,31 +52,43 @@ public class EnemyPauseMod extends Mod{
         if(Vars.headless) return;
 
         // KeyBind.all 属于 arc，跨 mod 重新加载依然存在，正好可以拿它当"是否已注册过"的标记。
-        // mod 重新加载时 init() 会再执行一次，那时必须复用同一个按键并跳过监听注册：
-        // 否则同一次按键会被两个监听处理两次，两次 toggle 互相抵消，看起来就像按键失灵。
-        KeyBind existing = KeyBind.all.find(b -> b.name.equals(BIND_NAME));
-        if(existing != null){
-            toggleBind = existing;
+        // mod 重新加载时 init() 会再执行一次，那时必须复用已有按键并跳过监听注册：
+        // 否则同一次按键会被两个监听处理两次（两次 toggle 互相抵消、看起来就像按键失灵）。
+        KeyBind existingToggle = KeyBind.all.find(b -> b.name.equals(BIND_NAME));
+        KeyBind existingSkip = KeyBind.all.find(b -> b.name.equals(SKIP_BIND_NAME));
+
+        if(existingToggle != null && existingSkip != null){
+            toggleBind = existingToggle;
+            skipBind = existingSkip;
             return;
         }
 
-        toggleBind = KeyBind.add(BIND_NAME, DEFAULT_KEY, BIND_CATEGORY);
+        // 逐个判断而不是整体 return：万一只有一个已注册（比如上个版本只有暂停键），
+        // 缺的那个还能补上
+        toggleBind = existingToggle != null ? existingToggle : KeyBind.add(BIND_NAME, DEFAULT_KEY, BIND_CATEGORY);
+        skipBind = existingSkip != null ? existingSkip : KeyBind.add(SKIP_BIND_NAME, DEFAULT_SKIP_KEY, BIND_CATEGORY);
 
         // Trigger.update 每帧都触发（游戏内菜单打开时也触发），在这里轮询按键。
         // 用 Events.run 而不是 Events.on：Trigger 是个枚举，注册用的"键"就是枚举常量本身。
-        Events.run(Trigger.update, this::pollKey);
+        Events.run(Trigger.update, this::pollKeys);
 
-        // afterGameUpdate 在倒计时递减、runWave() 判断、敌方 AI 与建筑这一帧的更新之后触发，
+        // afterGameUpdate 在倒计时递减、runWave() 判断、目标推进与敌方 AI 这一帧的更新之后触发，
         // 只有在这个时机写回读数才真的按得住敌方倒计时。
         Events.run(Trigger.afterGameUpdate, pause::update);
 
-        Log.info("[enemy-pause] loaded. Default key: " + DEFAULT_KEY.name()
+        Log.info("[enemy-pause] loaded. Pause: " + DEFAULT_KEY.name()
+            + ", Skip: " + DEFAULT_SKIP_KEY.name()
             + " (rebindable in Settings -> Keybinds).");
     }
 
-    private void pollKey(){
-        if(toggleBind != null && Core.input != null && Core.input.keyTap(toggleBind)){
+    private void pollKeys(){
+        if(Core.input == null) return;
+
+        if(toggleBind != null && Core.input.keyTap(toggleBind)){
             pause.toggle();
+        }
+        if(skipBind != null && Core.input.keyTap(skipBind)){
+            pause.skip();
         }
     }
 }

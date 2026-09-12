@@ -68,18 +68,23 @@ tools\pack.ps1 -Install      # Windows 等价操作
 
 ### Enemy Pause 模组
 
-`Enemy Pause/` 里的模组做一件事：**战役模式下按一个键，暂停 / 继续敌方侧的倒计时。**
+`Enemy Pause/` 里的模组管敌方侧的倒计时：**暂停 / 继续**，以及**跳到终点**。
 
-冻的是「下一件事什么时候发生」，**不是敌人本身**：已经在场的敌方单位照常行动开火，
+动的是倒计时，**不是敌人本身**：已经在场的敌方单位照常行动开火，
 敌方工厂照常生产、照常激活，玩家侧也不受影响。
+
+| 按键 | 功能 | 说明 |
+| --- | --- | --- |
+| **Y** | 暂停 / 继续 | 冻住倒计时，或让它接着走 |
+| **U** | 跳过本轮 | 直接推到终点，让后果立刻发生 |
 
 | 项 | 值 |
 | --- | --- |
-| 默认按键 | **Y**（在 设置 → 按键 的「常规」分组里可改） |
-| 生效范围 | 只在战役模式，且只对单机有效；`rules.waves` 或 `rules.attackMode` 至少开着一个 |
-| 游戏内反馈 | 暂停 / 继续时屏幕下方弹一条提示 |
+| 按键设置 | 在 设置 → 按键 的「常规」分组里可改（`keybind.enemy_pause` / `keybind.enemy_pause_skip`） |
+| 生效范围 | 暂停只在战役模式、且只对单机有效（`rules.waves` 或 `rules.attackMode` 至少开着一个）；跳过不限战役 |
+| 游戏内反馈 | 每次操作都在屏幕下方弹一条提示 |
 
-之所以选 `Y`：Mindustry 自带的绑定已经占掉了 a~z 里除 `i k l o u y` 以外的所有字母，
+之所以选 `Y` / `U`：Mindustry 自带的绑定已经占掉了 a~z 里除 `i k l o u y` 以外的所有字母，
 其中语义最贴近的 `p`（地图标记 ping）和空格（游戏暂停）都被占了。
 
 #### 冻结哪两项
@@ -138,7 +143,34 @@ Events.fire(Trigger.afterGameUpdate);                    // ← 模组的写回�
   以及行星图上「敌方入侵已占领星区」的回合倒计时。
 
 > 演进记录：v0.1 只冻波次；v0.2 误把「敌方行为」也冻了（工厂激活、生产进度、基地 AI 计时器）；
-> v0.3 按需求移除行为类；v0.4 才找到真正该冻的第 2 项——地图目标里的计时目标。
+> v0.3 按需求移除行为类；v0.4 才找到真正该冻的第 2 项——地图目标里的计时目标；v0.5 加入 U 键跳过。
+
+#### 跳过（U 键）
+
+把正在走的倒计时**直接推到终点**，让后果立刻发生。实现见 `EnemySkip`：
+
+| 倒计时 | 跳过方式 | 后果 |
+| --- | --- | --- |
+| 波次 | `Vars.logic.skipWave()` —— 就是 HUD 上那个「提前进攻」按钮干的事 | 立刻出兵，并把 `wavetime` 重置成一整轮 |
+| 目标计时 | `MapObjective.done()` | 目标立刻完成，执行 `objectiveFlags` 增减与 `completionLogicCode` |
+
+关于目标计时为什么要自己调 `done()` 而不是 `Call.completeObjective(index)`：
+后者的方法体只有 `objectives.get(index).done()` 一句（已对 160.1 的字节码确认），
+直接调完全等价，还省掉了对 `Vars.net` 的依赖（`Call` 内部要用 `net.server()`）。
+
+跳过时的几个判断：
+
+- **只跳「此刻正在跑」的计时目标**（`qualified()`），而且是**先收集、再逐个完成**。
+  计时目标可以挂在父目标下面（`MapObjective.parents`），父目标没完成前它根本不参与更新。
+  如果边遍历边完成，刚被父目标解锁的子目标会在同一轮里变得 `qualified` 而被一起跳掉——
+  但它其实才刚开始数，不该跳。
+- 波次要满足 `rules.waves && rules.waveSending`，且游戏没有自己按住倒计时
+  （`logic.isWaitingWave()`，比如场上还有敌人又开了 `waitEnemies`）、也没有正在放兵
+  （`spawner.isSpawning()`）。
+- 没有可跳的东西时弹「当前没有可跳过的倒计时」，不会静默失败。
+- **如果在暂停状态下按 U，会先解除暂停**（按「自动解除」处理，不还原读数）——
+  跳过之后时间正常流逝。
+- 菜单 / 编辑器里不做任何事：既没有「本轮倒计时」，也不能让 `runWave()` 在空世界上跑。
 
 ### 目录结构
 
@@ -186,18 +218,20 @@ Copy-Item build\libs\EnemyPause.jar "E:\SteamLibrary\steamapps\common\Mindustry\
 3. 语言包放在 jar 内的 `bundles/` 目录下（放到根目录会静默失效，见下文）
 4. 代码里以模组内部名为前缀的文案键（如 `enemy-pause.paused`）都在语言包里定义了
 
-另有 `tools/epverify`：针对 `EnemyTimers` 的离线验证，用真实游戏类构造最小环境（`Vars.state` + 敌方
-`TeamData`），校验三件事，不用启动游戏：
+另有 `tools/epverify`：离线验证，用真实游戏类构造最小环境（`Vars.state` + 目标 / 敌方 `TeamData`），
+不用启动游戏。两个程序都靠“先把结论写死、再跑实际代码对照”的方式抓 bug。
 
-1. 反射能拿到 `BaseBuilderAI.timer` / `RtsAI.timer`
-2. 暂停期间波次倒计时与 AI 计时器是否真的停住（含对照组：不暂停时 60 tick 会正常触发）
-3. 恢复后 AI 计时器是否接着剩余时间走，而不是重新数满一轮
+| 程序 | 验证什么 |
+| --- | --- |
+| `VerifyEnemyTimers` | 计时目标与波次倒计时确实停住；且不会在暂停瞬间漏出“完成判定”（含只剩 0.5 tick 的边界） |
+| `VerifyEnemySkip` | 只跳“此刻正在跑”的计时目标；挂在未完成父目标下的子目标不被误跳；菜单状态与无目标时安全退化 |
 
 ```bash
 CP="Enemy Pause/libs/dependencies.jar:Enemy Pause/build/libs/EnemyPause.jar"   # Windows 下分隔符改成 ;
-javac -encoding UTF-8 -implicit:none -sourcepath tools/epverify -cp "$CP" \
-  -d tools/epverify/out tools/epverify/VerifyEnemyTimers.java
-java -Dfile.encoding=UTF-8 -cp "tools/epverify/out:$CP" VerifyEnemyTimers
+for V in VerifyEnemyTimers VerifyEnemySkip; do
+  javac -encoding UTF-8 -implicit:none -sourcepath tools/epverify -cp "$CP" -d tools/epverify/out tools/epverify/$V.java
+  java -Dfile.encoding=UTF-8 -cp "tools/epverify/out:$CP" $V
+done
 ```
 
 > `-sourcepath` 必须显式指定：`dependencies.jar` 里同时打包了 `.java` 源码，
@@ -211,9 +245,10 @@ settings.gradle         项目名 EnemyPause（目录名有空格，产物名不
 gradle.properties       目标游戏版本 mindustryVersion=v160.1（脚本共用）
 mod.hjson               模组元数据，必须打进 jar 根目录
 src/enemypause/
-    EnemyPauseMod.java      入口：注册按键、挂事件监听
-    EnemyPause.java         暂停状态机：生效范围判定、自动解除
-    EnemyTimers.java        四类敌方倒计时的冻结 / 还原
+    EnemyPauseMod.java      入口：注册 Y / U 两个按键、挂事件监听
+    EnemyPause.java         状态机：生效范围判定、自动解除、跳过编排
+    EnemyTimers.java        两类敌方倒计时的冻结（Y）
+    EnemySkip.java          两类敌方倒计时的跳过（U）
 assets/sprites/*.png    贴图；源码路径 assets/sprites/foo.png 会变成 jar 内的 sprites/foo.png
 bundles/
     bundle.properties       默认（英文）语言包
@@ -240,9 +275,9 @@ build/libs/EnemyPause.jar   构建产物
 只表现为界面显示原始键名，光看日志查不出来。（`assets/` 相反，正需要落到 jar 根：
 源码 `assets/sprites/foo.png` → jar 内 `sprites/foo.png`。）`check.sh` 现在会抓这个。
 
-**改按键的默认值 / 名称**：改 `EnemyPauseMod` 里的 `DEFAULT_KEY`（按键）或 `BIND_NAME`
-（标识）。注意 `BIND_NAME` 会拼成翻译键 `keybind.<BIND_NAME>.name`，改了要同步改两个语言包。
-按键所在的分类由 `BIND_CATEGORY` 决定，当前用的是游戏自带的 `general`，
+**改按键的默认值 / 名称**：改 `EnemyPauseMod` 里的 `DEFAULT_KEY`（默认 Y）/ `DEFAULT_SKIP_KEY`（默认 U），
+或 `BIND_NAME` / `SKIP_BIND_NAME`（标识）。注意标识会拼成翻译键 `keybind.<标识>.name`，
+改了要同步改两个语言包。按键所在的分类由 `BIND_CATEGORY` 决定，当前用的是游戏自带的 `general`，
 所以设置里会显示已翻译好的「常规」；换成别的分类就得自己补 `category.<分类>.name`。
 
 **换目标游戏版本**：改 `Enemy Pause/gradle.properties` 里的 `mindustryVersion`，
@@ -268,11 +303,29 @@ build/libs/EnemyPause.jar   构建产物
 
 ### 游戏内验证
 
-1. `./run.sh`（构建 + 部署 + 启动游戏 + 跟日志）
-2. 开一局**战役**地图，日志里应出现 `Loaded mod 'enemy-pause'`
-3. 按 `Y`：弹出「敌方倒计时已暂停（进攻 / 扩建 / 生产）」；再按 `Y` 弹出「敌方倒计时已继续」
-4. 看倒计时有没有真的停住：波次读数应定住不动；有敌方核心的图可以看敌方是否停止扩建/出单位
-   ——打不开游戏时用 `./check.sh` 先排掉打包/元数据问题
+Windows 上手动构建 + 安装（游戏目录见上表）：
+
+```powershell
+cd "Enemy Pause"
+$env:GRADLE_USER_HOME = "$PWD\..\tools\gradle-home"
+.\gradlew.bat jar --offline
+Copy-Item build\libs\EnemyPause.jar "E:\SteamLibrary\steamapps\common\Mindustry\saves\mods\" -Force
+```
+
+然后重启游戏（模组只在启动时加载）：
+
+1. 开一局**战役**地图，日志里应出现 `[enemy-pause] loaded. Pause: y, Skip: u`
+2. 按 `Y`：弹出「敌方倒计时已暂停」；再按 `Y` 弹出「已继续」。看 HUD 上的倒计时与
+   「敌人来袭」这类目标计时是否真的定住不动
+3. 按 `U`：弹出「敌方倒计时已跳过」。波次应立刻到来；目标计时应立刻完成
+4. 日志里会有诊断行，可用来确认冻结接上了：
+
+```
+[enemy-pause] frozen: wave=14400 tick, timerObjectives=1
+```
+
+`timerObjectives` 为 0 说明这张图没有计时目标（正常）；若图上有「敌人来袭」却一直是 0，
+那就是反射没拿到 `countup`，应能看到一条 warn。
 
 ### 注意事项
 
