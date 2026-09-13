@@ -10,7 +10,11 @@ __pycache__/
 # IDE
 .idea/
 *.iml
+*.class
 .vscode/ipch/
+
+# IDE 编译输出（Eclipse / VS Code Java 语言服务器）
+bin/
 
 # 内置工具链（macOS 开发机用，体积很大，不参与版本管理）
 tools/jdk/
