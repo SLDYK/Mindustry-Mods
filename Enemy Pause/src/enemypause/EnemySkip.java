@@ -1,9 +1,11 @@
 package enemypause;
 
+import arc.struct.IntSeq;
 import arc.struct.Seq;
 import mindustry.Vars;
 import mindustry.game.MapObjectives.MapObjective;
 import mindustry.game.MapObjectives.TimerObjective;
+import mindustry.gen.Call;
 
 /**
  * 「跳过本轮倒计时」：把正在走的倒计时直接推到终点，让后果立刻发生。
@@ -17,10 +19,11 @@ import mindustry.game.MapObjectives.TimerObjective;
  *   1. 波次倒计时  用 Logic.skipWave()，也就是 HUD 上那个「提前进攻」按钮干的事：
  *                  runWave() 立刻出兵，并把 wavetime 重置成一整轮。
  *
- *   2. 目标计时    调用 MapObjective.done()。游戏自己的 MapObjectives.update() 判定通过后
- *                  也是走 Call.completeObjective(index) → done()，而那个 remote 方法体里
- *                  除了 done() 什么也没做（已对着 160.1 的字节码确认），所以直接调 done()
- *                  完全等价，还省掉了对 Vars.net 的依赖。
+ *   2. 目标计时    调用 Call.completeObjective(index)。它内部就是 done()，但**别直接调 done()**：
+ *                  单机下它本地执行 done()，联机下主机端除了本地执行还会把
+ *                  CompleteObjectiveCallPacket 发给所有客户端（已对 160.1 的字节码确认）；
+ *                  直接调 done() 在联机下客户端什么也收不到，它的计时目标会一直跑下去，
+ *                  界面上的数字越过上限后变成负数，而且目标永远不会从列表里消失。
  *                  done() 内部：加/减 objectiveFlags、标记完成、跑 completionLogicCode。
  */
 public class EnemySkip{
@@ -61,15 +64,17 @@ public class EnemySkip{
         // 先收集、再逐个完成。不能边遍历边调 done()：done() 会改父子依赖状态，
         // 于是"刚被父目标解锁的子目标"会在同一轮里变得 qualified 而被一起跳掉，
         // 但它其实才刚开始数，不该跳。
-        Seq<TimerObjective> running = new Seq<>();
-        for(MapObjective objective : all){
+        IntSeq running = new IntSeq();
+        for(int i = 0; i < all.size; i++){
+            MapObjective objective = all.get(i);
             if(objective instanceof TimerObjective timer && timer.qualified()){
-                running.add(timer);
+                running.add(i);
             }
         }
 
-        for(TimerObjective timer : running){
-            timer.done();
+        for(int i = 0; i < running.size; i++){
+            // 走官方远程：单机=本地执行，主机端=本地执行 + 广播给客户端
+            Call.completeObjective(running.get(i));
         }
         return running.size > 0;
     }

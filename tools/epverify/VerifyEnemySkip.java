@@ -9,6 +9,8 @@ import mindustry.game.MapObjectives.TimerObjective;
  *   1. 只有「此刻正在跑」的计时目标会被跳过；挂在未完成父目标下的子目标不能被跳
  *   2. 非游戏状态（菜单）下什么也不做——尤其不能让 runWave() 在空世界上跑
  *   3. Vars.logic 为空时能安全退化，不抛异常
+ *   4. 目标完成走的是 Call.completeObjective（单机下它就是本地 done()，
+ *      联机下主机端还会把完成广播给客户端）——不能被改成直接 done()
  *
  * 编译运行：
  *   CP="Enemy Pause/libs/dependencies.jar;Enemy Pause/build/libs/EnemyPause.jar"
@@ -19,6 +21,11 @@ public class VerifyEnemySkip{
     static int failures = 0;
 
     public static void main(String[] args){
+        // 最小环境：Call.completeObjective 内部要问 Vars.net.server()/active()，
+        // 所以得给它一个“没连网”的 Net 实例——那正是单机的形态（server=false, active=false），
+        // 于是它会在本地执行 done()，与实际单机行为一致。
+        Vars.net = new mindustry.net.Net(null);
+
         // ---- 1. 菜单状态：不应跳任何东西 ----
         Vars.state = new GameState();
         check("菜单状态下 all() 返回 false", !enemypause.EnemySkip.all());

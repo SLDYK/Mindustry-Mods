@@ -8,6 +8,7 @@ import arc.util.Log;
 import mindustry.Vars;
 import mindustry.game.EventType.Trigger;
 import mindustry.mod.Mod;
+import mindustry.net.Net;
 
 /**
  * Enemy Pause 模组入口。
@@ -20,6 +21,9 @@ import mindustry.mod.Mod;
  *
  * 冻的只是倒计时，不是敌人本身：已在场单位照常行动，工厂照常生产。
  * 细节见 EnemyTimers / EnemySkip，状态机见 EnemyPause。
+ *
+ * 联机时两个键都只在主机端生效：主机端一变状态就广播给所有客户端
+ * （EnemyPausePacket），客户端弹同样的提示、并把倒计时也按在同一个读数上。
  */
 public class EnemyPauseMod extends Mod{
 
@@ -43,11 +47,19 @@ public class EnemyPauseMod extends Mod{
     /** 跳过键默认绑定 u——和 y 同一批剩下的字母。 */
     public static final KeyCode DEFAULT_SKIP_KEY = KeyCode.u;
 
-    private final EnemyPause pause = new EnemyPause();
+    private final EnemyPause pause = EnemyPause.instance;
     private KeyBind toggleBind, skipBind;
 
     @Override
     public void init(){
+        // 封包注册要放在无头服务端检查之前：封包 ID 是按注册顺序递增分配的，
+        // 两端注册的东西不一样就会错位。
+        // 只在没注册过时注册——mod 重新加载时 init() 会再执行一次，
+        // 重复注册会白占一个 ID，让与对端的编号对不上。
+        if(Net.getPacketClassId(EnemyPausePacket.class) == -1){
+            Net.registerPacket(EnemyPausePacket::new);
+        }
+
         // 按键轮询和 HUD 提示都只存在于客户端，无头服务端不需要
         if(Vars.headless) return;
 

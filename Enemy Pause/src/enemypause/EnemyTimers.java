@@ -12,9 +12,10 @@ import java.lang.reflect.Field;
  * 冻结敌方侧的倒计时：一个实例代表一次暂停会话。
  *
  * 用法（都由 EnemyPause 驱动）：
- *   capture()  暂停瞬间记录各倒计时当前的读数，并立刻写回一次
- *   hold()     每帧（Trigger.afterGameUpdate）写回读数，抵消这一帧的时间推进
- *   release()  手动恢复时清掉记录，让倒计时接着暂停前的位置走
+ *   new EnemyTimers()          主机端 / 单机：按当前读数就地冻结
+ *   EnemyTimers.remote(t)      客户端：采用主机端广播来的波次读数
+ *   hold()                     每帧（Trigger.afterGameUpdate）写回读数，抵消这一帧的时间推进
+ *   release()                  手动恢复时清掉记录，让倒计时接着暂停前的位置走
  *
  * 冻结的两项（括号里是 mindustry v160.1 的源码位置）：
  *
@@ -30,6 +31,11 @@ import java.lang.reflect.Field;
  *
  * 两项都只是把「下一件事什么时候发生」按住，不动敌方的行为本身：
  * 已经在场的单位照常行动开火，工厂照常生产与激活，基地 AI 也照常扩建。
+ *
+ * 联机时两端各持有一个实例：主机端冻结的就是它自己的状态，客户端则是收到主机端广播后
+ * 用同一个读数把自己那份状态也按住——客户端的 wavetime / countup 都不参与同步，
+ * 不摁住的话波次倒计时会一直减到 0（快照到了又跳回去），目标计时的 countup 更会越过
+ * 上限，界面上直接显示成负数（TimerObjective.text() 算的是 limit - countup）。
  */
 public class EnemyTimers{
 
@@ -55,25 +61,44 @@ public class EnemyTimers{
     private static final Field COUNTUP = findCountup();
 
     // ---- 1. 波次倒计时 ----
-    private float frozenWaveTime;
+    private final float frozenWaveTime;
 
     // ---- 2. 地图目标里的计时目标 ----
     /** 各计时目标在暂停瞬间的 countup 读数。 */
     private final ObjectMap<TimerObjective, Float> frozenTimers = new ObjectMap<>();
 
-    /** 暂停瞬间记录各倒计时的当前读数。 */
-    public void capture(){
-        frozenWaveTime = Math.max(Vars.state.wavetime, MIN_HOLD_TICKS);
+    /** 主机端 / 单机：把当前的波次与计时目标读数就地冻住。 */
+    public EnemyTimers(){
+        this(Vars.state.wavetime);
+    }
+
+    /**
+     * 客户端：采用主机端广播来的波次读数。
+     *
+     * 客户端不能就地取值：它收到广播时本地的 wavetime 已经比主机端低了一小截（网络延迟期间
+     * 还在自己递减），照抄主机端的数字才能让两边显示完全一致。
+     * 地图目标的 countup 不参与同步，所以只能就地取（拿不到主机端的值）。
+     */
+    public static EnemyTimers remote(float waveTime){
+        return new EnemyTimers(waveTime);
+    }
+
+    private EnemyTimers(float waveTime){
+        frozenWaveTime = Math.max(waveTime, MIN_HOLD_TICKS);
         // 立刻写一次：这样"倒计时已经归零、这一波正要发起"的那一帧也能被拦住
         Vars.state.wavetime = frozenWaveTime;
 
-        frozenTimers.clear();
         rememberTimers();
         holdTimers();
 
         // 实测时可以看这行：timerObjectives 一直是 0，说明这张图没有计时目标
         Log.info("[enemy-pause] frozen: wave=@ tick, timerObjectives=@",
             (int)frozenWaveTime, frozenTimers.size);
+    }
+
+    /** 本会话冻结住的波次倒计时读数——主机端要把它广播给客户端。 */
+    public float waveTime(){
+        return frozenWaveTime;
     }
 
     /**
@@ -100,7 +125,7 @@ public class EnemyTimers{
     /**
      * 记录还没见过的计时目标。
      *
-     * 不能在 capture() 里一次记完了事：目标可以挂在别的目标下面
+     * 不能在构造时一次记完了事：目标可以挂在别的目标下面
      * （MapObjective.parents），父目标没完成前它根本不参与更新，
      * 界面上的数字也是第一次 qualified 之后才有意义。
      */
