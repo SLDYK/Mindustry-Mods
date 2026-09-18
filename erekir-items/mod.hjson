@@ -1,0 +1,22 @@
+# 游戏内显示的模组名
+# 模组是个容器，以后会陆续加别的建筑，所以这里用中性的名字，
+# 具体建筑名走 bundles 里的 block.<内容名>.name
+displayName: "埃里克尔物品"
+
+# 模组内部名（唯一标识）：既是内容名前缀，也是贴图文件名的前缀
+# 当前唯一方块的完整内容名 = erekir-items-tunable-node
+name: "erekir-items"
+
+author: "SLDYK"
+
+main: "erekiritems.ErekirItemsMod"
+
+description: "埃里克尔内容模组。目前含一个可调电力节点：点开方块即可设置输出功率（0 ~ 1000000 电力/秒），接上光束节点就能供电，开局即可建造、无需研究。"
+
+version: "1.0.0"
+
+# 编译与实机验证所用的游戏版本：v8 / build 160.4（Version.build = 160）
+minGameVersion: "160"
+
+# 标记为 Java 模组
+java: true

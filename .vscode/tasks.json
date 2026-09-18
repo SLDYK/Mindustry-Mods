@@ -25,28 +25,28 @@
                 "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/pack.ps1"]
             }
         },
-        // ---- Erekir Power Node（Windows：pack.ps1 + 离线校验脚本）----
+        // ---- Erekir Items（Windows：pack.ps1 + 离线校验脚本）----
         {
-            "label": "Erekir Node: 构建 / 安装",
+            "label": "Erekir Items: 构建 / 安装",
             "type": "shell",
             "command": "powershell",
-            "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/pack.ps1", "-Mod", "erekir-power-node", "-Install"],
+            "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/pack.ps1", "-Mod", "erekir-items", "-Install"],
             "problemMatcher": ["$javac"],
             "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
         },
         {
-            "label": "Erekir Node: 校验产物",
+            "label": "Erekir Items: 校验产物",
             "type": "shell",
             "command": "powershell",
-            "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/pnverify/verify.ps1"],
+            "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/eiverify/verify.ps1"],
             "problemMatcher": ["$javac"],
             "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
         },
         {
-            "label": "Erekir Node: 重新生成贴图",
+            "label": "Erekir Items: 重新生成贴图",
             "type": "shell",
             "command": "powershell",
-            "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/gen-erekir-node-sprite.ps1"],
+            "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/gen-tunable-node-sprite.ps1"],
             "problemMatcher": [],
             "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
         },

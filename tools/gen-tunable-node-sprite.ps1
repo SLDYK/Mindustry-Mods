@@ -6,14 +6,14 @@
 #
 # Pure ASCII on purpose: PowerShell 5.1 reads non-BOM script files as cp936.
 #
-# Usage:  powershell -ExecutionPolicy Bypass -File tools\gen-erekir-node-sprite.ps1
+# Usage:  powershell -ExecutionPolicy Bypass -File tools\gen-tunable-node-sprite.ps1
 
 Add-Type -AssemblyName System.Drawing
 
 $root = Split-Path -Parent $PSScriptRoot
 # NOTE: mod sprites are packed under "<mod internal name>-<file base name>", so the file
 # itself must NOT repeat the mod name (that would produce a double prefix).
-$outFile = Join-Path $root "erekir-power-node\assets\sprites\tunable-node.png"
+$outFile = Join-Path $root "erekir-items\assets\sprites\tunable-node.png"
 $size = 32
 
 $bmp = New-Object System.Drawing.Bitmap($size, $size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)

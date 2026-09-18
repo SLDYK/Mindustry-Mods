@@ -1,16 +1,28 @@
-# erekir-power-node — 埃里克尔可调电力节点
+# erekir-items — 埃里克尔内容模组
+
+模组是个**容器工程**：以后陆续往里加埃里克尔的建筑 / 物品，每个内容一项。
+当前只有一项。
+
+## 当前内容
+
+### 可调电力节点（`tunable-node`）
 
 给行星**埃里克尔**加一个电力节点：接进电网后往电网里送电，**送多少由玩家自己填**。
 
 | 项 | 值 |
 | --- | --- |
-| 模组内部名 | `erekir-power-node` |
 | 方块名（游戏内） | 可调电力节点 / Tunable Power Node |
-| 内容名 | `erekir-power-node-tunable-node` |
+| 内容名 | `erekir-items-tunable-node` |
 | 建造位置 | 电力分类，**仅埃里克尔**，**开局即可建造**（不需要研究） |
 | 造价 | 铍 20 + 硅 10 |
 | 输出范围 | 0 ~ 1000000 电力/秒（默认 1000） |
 | 连接方式 | 与原版光束节点一致：向四个正方向自动连接 12 格内第一个带电网的建筑 |
+
+| 模组级信息 | 值 |
+| --- | --- |
+| 模组内部名 | `erekir-items`（内容名前缀 / 贴图前缀） |
+| 主类 | `erekiritems.ErekirItemsMod` |
+| 游戏内模组名 | 埃里克尔物品（`mod.hjson` 的 `displayName`） |
 
 ## 游戏内怎么用
 
@@ -45,27 +57,43 @@
 贴图由脚本生成，不需要美术工具：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\gen-erekir-node-sprite.ps1
+powershell -ExecutionPolicy Bypass -File tools\gen-tunable-node-sprite.ps1
 ```
 
 > **命名陷阱（踩过一次）**：游戏的模组贴图打包规则是
 > `sprites/<文件名>.png` → 图集里的区域名 `<模组内部名>-<文件名>`
 > （见 `Mods.packSprites()`；只有当文件名第一个 `-` 之后的部分已经以 `<模组名>-` 开头时才不再加前缀）。
-> 所以文件必须叫 **`tunable-node.png`**，不能叫 `erekir-power-node-tunable-node.png` —— 后者会被拼成
-> `erekir-power-node-erekir-power-node-tunable-node`，方块就找不到自己的贴图了。
+> 所以文件必须叫 **`tunable-node.png`**，不能叫 `erekir-items-tunable-node.png` —— 后者会被拼成
+> `erekir-items-erekir-items-tunable-node`，方块就找不到自己的贴图了。
 > 离线校验里的 `findSpriteForRegion()` 复刻了这条规则，改文件名后跑一下校验即可确认。
 
 光束贴图不用自己做：`BeamNode` 的 `laser` / `laserEnd` 字段带 `@Load(value = "@-beam", fallback = "power-beam")`，
 生成的加载代码对 `instanceof BeamNode` 生效（`mindustry.gen.ContentRegions`），找不到自己的 `-beam` 就自动用原版贴图。
 
+## 加一个新建筑 / 物品
+
+模组是容器工程，加内容的套路固定的：
+
+1. 在 `src/erekiritems/` 下新建方块类（继承 `PowerBlock` / `GenericCrafter` 等），类名即内容名后缀。
+2. 在 `ErekirItemsMod.loadContent()` 里 `new` 出来，赋给一个 `public static` 字段。
+   - 内容创建**必须**在这个方法里：此时原版内容与两个行星都已就绪。
+   - 想让它在建造菜单里出现，别忘了 `requirements(Category.xxx, ItemStack.with(...))`。
+3. 丢一张 `assets/sprites/<方块名>.png`（**不要**带模组名前缀，游戏会自动加）。
+4. 两份语言包都补上：`block.erekir-items-<方块名>.name` / `.description`（可选 `.details`），以及自己代码里用到的键。
+5. 想加科技树节点：删掉 `alwaysUnlocked`，在 `loadContent()` 里往埃里克尔树上挂 `TechNode`（参考 `mindustry.content.ErekirTechTree`）。
+6. 跑 `tools\pack.ps1 -Mod "erekir-items"` + `tools\eiverify\verify.ps1`。
+
+> 新增内容后建议同步扩充 `tools/eiverify/VerifyTunableNode.java` 里的 `required[]` 数组
+> —— 它就是「代码用到的语言包键清单」，漏写文案会被校验拦住。
+
 ## 构建 / 安装
 
 ```powershell
-# 构建（产物 erekir-power-node/build/libs/erekir-power-node.jar）
-tools\pack.ps1 -Mod "erekir-power-node"
+# 构建（产物 erekir-items/build/libs/erekir-items.jar）
+tools\pack.ps1 -Mod "erekir-items"
 
 # 构建并安装到游戏 mods 目录
-tools\pack.ps1 -Mod "erekir-power-node" -Install
+tools\pack.ps1 -Mod "erekir-items" -Install
 ```
 
 编译依赖按顺序探测：`MINDUSTRY_JAR` 环境变量 → 本模组 `libs/dependencies.jar` → 本机游戏 `jre/desktop.jar` → 联网下载官方 v159.7 依赖。
@@ -74,10 +102,10 @@ tools\pack.ps1 -Mod "erekir-power-node" -Install
 ## 离线校验（不开游戏）
 
 ```powershell
-tools\pnverify\verify.ps1          # 见 VS Code 任务「Erekir Node: 校验产物」
+tools\eiverify\verify.ps1          # 见 VS Code 任务「Erekir Items: 校验产物」
 ```
 
-`tools/pnverify/VerifyTunableNode.java` 会用**真实的无头内容加载流程**（`ContentLoader.createBaseContent()`）把方块创建出来，校验 62 项：
+`tools/eiverify/VerifyTunableNode.java` 会用**真实的无头内容加载流程**（`ContentLoader.createBaseContent()`）把方块创建出来，校验 62 项：
 
 - jar 结构：`mod.hjson` 在根目录、主类在包里、贴图文件名能解析出正确的内容名、中英两份语言包都存在且定义了代码里用到的每一个键（含 `{0}/{1}` 占位符）；
 - 方块属性：`alwaysUnlocked`、`shownPlanets == {erekir}`、`outputsPower && !consumesPower`、`configurable/saveConfig/clearOnDoubleTap`、分类与可见性、造价、配置处理器已注册；
@@ -87,11 +115,11 @@ tools\pnverify\verify.ps1          # 见 VS Code 任务「Erekir Node: 校验产
 ## 文件结构
 
 ```
-erekir-power-node/
+erekir-items/
 ├─ mod.hjson                          # 模组元信息（name 决定内容名前缀与贴图前缀）
 ├─ build.gradle / settings.gradle     # 依赖探测 + 打包规则（assets/ 内容铺到 jar 根目录）
-├─ src/erekirpower/
-│   ├─ ErekirPowerMod.java            # 模组入口，loadContent() 里注册方块
+├─ src/erekiritems/
+│   ├─ ErekirItemsMod.java            # 模组入口，loadContent() 里注册方块
 │   └─ TunableNode.java               # 方块 + TunableNodeBuild（配置界面、发电、存档）
 └─ assets/
     ├─ sprites/tunable-node.png       # 方块贴图（脚本生成）

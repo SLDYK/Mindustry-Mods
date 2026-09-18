@@ -1,14 +1,14 @@
-# Offline verifier for the erekir-power-node mod.
+# Offline verifier for the erekir-items mod.
 #
-# Compiles tools/pnverify/VerifyTunableNode.java against the local game jar plus the
+# Compiles tools/eiverify/VerifyTunableNode.java against the local game jar plus the
 # freshly built mod jar and runs it. No game process is started.
 #
 # NOTE: keep this file pure ASCII -- PowerShell 5.1 reads non-BOM script files as cp936.
 #
-# Usage:  powershell -ExecutionPolicy Bypass -File tools\pnverify\verify.ps1 [-Mod erekir-power-node]
+# Usage:  powershell -ExecutionPolicy Bypass -File tools\eiverify\verify.ps1 [-Mod erekir-items]
 
 param(
-    [string]$Mod = "erekir-power-node"
+    [string]$Mod = "erekir-items"
 )
 
 $ErrorActionPreference = "Stop"
@@ -54,13 +54,13 @@ if ($env:JAVA_HOME) {
     $java = Join-Path $env:JAVA_HOME "bin\java.exe"
 }
 
-Write-Host "[pnverify] game jar: $gameJar"
-Write-Host "[pnverify] mod jar : $modJar"
+Write-Host "[eiverify] game jar: $gameJar"
+Write-Host "[eiverify] mod jar : $modJar"
 
 $classpath = "$gameJar;$modJar"
 
-& $javac -encoding UTF-8 -implicit:none -sourcepath (Join-Path $root "tools\pnverify") `
-    -cp $classpath -d $outDir (Join-Path $root "tools\pnverify\VerifyTunableNode.java")
+& $javac -encoding UTF-8 -implicit:none -sourcepath (Join-Path $root "tools\eiverify") `
+    -cp $classpath -d $outDir (Join-Path $root "tools\eiverify\VerifyTunableNode.java")
 if ($LASTEXITCODE -ne 0) { throw "javac failed" }
 
 & $java '-Dfile.encoding=UTF-8' -cp "$outDir;$classpath" VerifyTunableNode $modJar

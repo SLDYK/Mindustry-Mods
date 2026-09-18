@@ -14,8 +14,8 @@ import mindustry.core.ContentLoader;
 import mindustry.gen.Building;
 import mindustry.type.Category;
 import mindustry.world.meta.BuildVisibility;
-import erekirpower.ErekirPowerMod;
-import erekirpower.TunableNode;
+import erekiritems.ErekirItemsMod;
+import erekiritems.TunableNode;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -35,8 +35,8 @@ import java.util.zip.ZipFile;
  *      round-trip (including clamping and configClear), the per-tick power math, and save IO.
  *
  * Run (Windows, from the repo root):
- *   javac -encoding UTF-8 -implicit:none -sourcepath tools/pnverify -cp "<game jar>;<mod jar>" -d tools/pnverify/out tools/pnverify/VerifyTunableNode.java
- *   java -Dfile.encoding=UTF-8 -cp "tools/pnverify/out;<game jar>;<mod jar>" VerifyTunableNode <mod jar>
+ *   javac -encoding UTF-8 -implicit:none -sourcepath tools/eiverify -cp "<game jar>;<mod jar>" -d tools/eiverify/out tools/eiverify/VerifyTunableNode.java
+ *   java -Dfile.encoding=UTF-8 -cp "tools/eiverify/out;<game jar>;<mod jar>" VerifyTunableNode <mod jar>
  */
 public class VerifyTunableNode{
     private static int checks = 0, failures = 0;
@@ -52,7 +52,7 @@ public class VerifyTunableNode{
             System.exit(2);
         }
 
-        Path tmp = Files.createTempDirectory("pnverify");
+        Path tmp = Files.createTempDirectory("eiverify");
         try{
             verifyJarAndBundles(jar, tmp);
             verifyBlock(jar, tmp);
@@ -95,13 +95,13 @@ public class VerifyTunableNode{
             // replicate the game's normalization: LoadedMod name = meta.name lowercased, spaces -> hyphens
             String normalized = modName == null ? null : modName.toLowerCase(java.util.Locale.ROOT).replace(" ", "-");
 
-            check("mod.hjson declares the mod main class", mainClass != null && mainClass.equals(ErekirPowerMod.class.getName()),
+            check("mod.hjson declares the mod main class", mainClass != null && mainClass.equals(ErekirItemsMod.class.getName()),
                 String.valueOf(mainClass));
             check("main class is inside the jar", zip.getEntry(mainClass.replace('.', '/') + ".class") != null);
 
             // mod sprites are packed as "<mod name>-<file base name>"; the block looks up its own
             // content name, so check that the file name really resolves to that region name.
-            String contentName = normalized + "-" + ErekirPowerMod.NODE_NAME;
+            String contentName = normalized + "-" + ErekirItemsMod.NODE_NAME;
             String spriteFile = findSpriteForRegion(zip, normalized, contentName);
             check("a mod sprite in sprites/ packs to the region '" + contentName + "'", spriteFile != null,
                 spriteFile == null ? describeSprites(zip) : spriteFile);
@@ -109,8 +109,8 @@ public class VerifyTunableNode{
             // bundles
             String[] bundleNames = {"bundles/bundle.properties", "bundles/bundle_zh_CN.properties"};
             String[] required = {
-                "block." + normalized + "-" + ErekirPowerMod.NODE_NAME + ".name",
-                "block." + normalized + "-" + ErekirPowerMod.NODE_NAME + ".description",
+                "block." + normalized + "-" + ErekirItemsMod.NODE_NAME + ".name",
+                "block." + normalized + "-" + ErekirItemsMod.NODE_NAME + ".description",
                 normalized + ".details",
                 "stat." + normalized + "-maxoutput",
                 normalized + ".output",
@@ -163,7 +163,7 @@ public class VerifyTunableNode{
 
         section("block definition");
 
-        TunableNode node = new TunableNode(ErekirPowerMod.NODE_NAME);
+        TunableNode node = new TunableNode(ErekirItemsMod.NODE_NAME);
 
         check("block name", "tunable-node".equals(node.name), node.name);
         check("alwaysUnlocked (no research needed)", node.alwaysUnlocked);

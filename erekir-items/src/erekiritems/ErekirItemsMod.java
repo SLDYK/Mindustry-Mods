@@ -1,4 +1,4 @@
-package erekirpower;
+package erekiritems;
 
 import arc.util.Log;
 import mindustry.mod.Mod;
@@ -9,7 +9,7 @@ import mindustry.mod.Mod;
  * <p>内容创建必须放在 {@code loadContent()}：游戏在 {@code ContentLoader.createModContent()}
  * 阶段调用它，此时原版方块与两个行星都已就绪，模组新建的方块才能正确拿到 id、归到埃里克尔名下。</p>
  */
-public class ErekirPowerMod extends Mod{
+public class ErekirItemsMod extends Mod{
     /** 方块名（游戏内完整内容名 = 模组内部名 + "-" + 这个名字）。 */
     public static final String NODE_NAME = "tunable-node";
 
@@ -19,6 +19,6 @@ public class ErekirPowerMod extends Mod{
     @Override
     public void loadContent(){
         node = new TunableNode(NODE_NAME);
-        Log.debug("[erekir-power-node] content loaded: @ (max @/s)", node.name, TunableNode.maxOutput);
+        Log.debug("[erekir-items] content loaded: @ (max @/s)", node.name, TunableNode.maxOutput);
     }
 }

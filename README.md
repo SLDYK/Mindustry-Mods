@@ -6,7 +6,7 @@
 |------|------|------|------------|
 | **ra2-controls** | `ra2-controls/` | RA2 风格指挥操作 Java 模组，见 `RA2-CONTROLS.md` / `PLAN.md` / `ra2-controls/README.md` | Windows |
 | **Enemy Pause** | `Enemy Pause/` | 战役模式下按键暂停 / 继续敌方侧的各种倒计时（进攻 / 扩建 / 生产），见下文 | macOS |
-| **erekir-power-node** | `erekir-power-node/` | 给行星埃里克尔加一个输出功率可调的电力节点（0 ~ 100 万电力/秒），见 `erekir-power-node/README.md` | Windows |
+| **erekir-items** | `erekir-items/` | 埃里克尔内容模组（容器工程），当前含一个输出功率可调的电力节点（0 ~ 100 万电力/秒），见 `erekir-items/README.md` | Windows |
 
 三个模组相互独立（各自的 gradle 工程、各自的构建脚本），互不影响：
 
@@ -34,7 +34,7 @@ tools\pack.ps1 -Install      # Windows 等价操作
 tools\pack.ps1 -Mod "Enemy Pause" -Install -Desktop
 
 # 埃里克尔可调电力节点：构建 -> 装到游戏 mods
-tools\pack.ps1 -Mod "erekir-power-node" -Install
+tools\pack.ps1 -Mod "erekir-items" -Install
 ```
 
 > 目录名不一定等于 jar 文件名（`Enemy Pause` 的产物是 `EnemyPause.jar`，取自 `settings.gradle`
@@ -49,9 +49,9 @@ tools\pack.ps1 -Mod "erekir-power-node" -Install
 | RA2: 构建 (ra2-controls) | 双平台 | gradle 构建，输出 `ra2-controls/build/libs/ra2-controls.jar`；Windows 走 `pack.ps1`，macOS/Linux 走 `pack.sh` |
 | RA2: 构建并安装 | 双平台 | 构建并安装到游戏 mods 目录（自动探测：Windows Steam = 游戏目录 `saves/mods`；macOS = `~/Library/Application Support/Mindustry/mods`） |
 | Enemy Pause: 构建 / 安装 / 拷桌面 | 双平台 | macOS 走 `build.sh && deploy.sh`；**Windows 走 `pack.ps1 -Mod "Enemy Pause" -Install -Desktop`** |
-| Erekir Node: 构建 / 安装 | Windows | `pack.ps1 -Mod "erekir-power-node" -Install`，产物 `erekir-power-node/build/libs/erekir-power-node.jar` |
-| Erekir Node: 校验产物 | Windows | 跑 `tools/pnverify/verify.ps1`，离线校验 jar 结构与方块逻辑（62 项，不启动游戏） |
-| Erekir Node: 重新生成贴图 | Windows | 跑 `tools/gen-erekir-node-sprite.ps1` 重新生成方块贴图（PS + System.Drawing，无需美术工具） |
+| Erekir Items: 构建 / 安装 | Windows | `pack.ps1 -Mod "erekir-items" -Install`，产物 `erekir-items/build/libs/erekir-items.jar` |
+| Erekir Items: 校验产物 | Windows | 跑 `tools/eiverify/verify.ps1`，离线校验 jar 结构与方块逻辑（62 项，不启动游戏） |
+| Erekir Items: 重新生成贴图 | Windows | 跑 `tools/gen-tunable-node-sprite.ps1` 重新生成方块贴图（PS + System.Drawing，无需美术工具） |
 | Mindustry: 构建模组 | macOS | 跑 `build.sh`（默认构建 `Enemy Pause/`），同时是默认构建任务（`Cmd+Shift+B`） |
 | Mindustry: 构建并部署 | macOS | `build.sh && deploy.sh` |
 | Mindustry: 校验产物 | macOS | `check.sh` 离线校验产物 |

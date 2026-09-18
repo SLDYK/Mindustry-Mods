@@ -60,10 +60,10 @@ repositories{
 
 dependencies{
     if(mindustryJar != null){
-        println "[erekir-power-node] 编译依赖: ${mindustryJar}"
+        println "[erekir-items] 编译依赖: ${mindustryJar}"
         compileOnly files(mindustryJar)
     }else{
-        println "[erekir-power-node] 本机未找到游戏 jar，回退下载 ${mindustryVersion}"
+        println "[erekir-items] 本机未找到游戏 jar，回退下载 ${mindustryVersion}"
         compileOnly "Anuken:Mindustry:$mindustryVersion"
     }
 }
@@ -75,7 +75,7 @@ tasks.withType(JavaCompile).configureEach{
 }
 
 jar{
-    archiveFileName = "erekir-power-node.jar"
+    archiveFileName = "erekir-items.jar"
 
     // mod.hjson 必须在 jar 根目录
     from(projectDir){ include "mod.hjson" }

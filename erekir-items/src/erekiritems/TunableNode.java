@@ -1,4 +1,4 @@
-package erekirpower;
+package erekiritems;
 
 import arc.Core;
 import arc.math.Mathf;
@@ -50,7 +50,7 @@ public class TunableNode extends BeamNode{
     public static final int[] presetOutputs = {0, 100, 1000, 10000, 100000, 1000000};
 
     /** 建造/详情面板里显示的“最大输出”条目。 */
-    public static final Stat maxOutputStat = new Stat("erekir-power-node-maxoutput");
+    public static final Stat maxOutputStat = new Stat("erekir-items-maxoutput");
 
     public TunableNode(String name){
         super(name);
@@ -74,7 +74,7 @@ public class TunableNode extends BeamNode{
         shownPlanets.add(Planets.erekir);
 
         // 详情文案里要带上具体的上限/默认值，所以用 format 而不是让语言包写死数字
-        details = Core.bundle.format("erekir-power-node.details", maxOutput, defaultOutput);
+        details = Core.bundle.format("erekir-items.details", maxOutput, defaultOutput);
 
         requirements(Category.power, ItemStack.with(Items.beryllium, 20, Items.silicon, 10));
 
@@ -156,12 +156,12 @@ public class TunableNode extends BeamNode{
             field.setMaxLength(7); // 最大 maxOutput = 1000000，正好 7 位
             field.setAlignment(Align.center);
 
-            table.add(Core.bundle.get("erekir-power-node.output")).padBottom(6f).row();
+            table.add(Core.bundle.get("erekir-items.output")).padBottom(6f).row();
 
             // 输入框 + 应用
             Table input = new Table();
             input.add(field).width(120f).height(42f).padRight(6f);
-            input.button(Core.bundle.get("erekir-power-node.apply"), Styles.flatt, () -> {
+            input.button(Core.bundle.get("erekir-items.apply"), Styles.flatt, () -> {
                 int value = clampOutput(Strings.parseInt(field.getText(), defaultOutput));
                 configure(value);
                 field.setText(String.valueOf(value));
