@@ -4,16 +4,17 @@
 displayName: "埃里克尔物品"
 
 # 模组内部名（唯一标识）：既是内容名前缀，也是贴图文件名的前缀
-# 当前唯一方块的完整内容名 = erekir-items-tunable-node
+# 例：可调电力节点的完整内容名 = erekir-items-tunable-node
 name: "erekir-items"
 
 author: "SLDYK"
 
 main: "erekiritems.ErekirItemsMod"
 
-description: "埃里克尔内容模组。目前含一个可调电力节点：点开方块即可设置输出功率（0 ~ 1000000 电力/秒），接上光束节点就能供电，开局即可建造、无需研究。"
+description: "埃里克尔内容模组。目前含两个建筑：可调电力节点（点开即可设置输出功率，0 ~ 1000000 电力/秒）；资源源（凭空产出物品、液体和热量，三者都可单独设置，物品与液体的类型随意挑）。开局即可建造、无需研究。"
 
-version: "1.0.0"
+# 模组版本
+version: "1.2.0"
 
 # 编译与实机验证所用的游戏版本：v8 / build 160.4（Version.build = 160）
 minGameVersion: "160"

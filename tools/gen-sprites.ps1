@@ -119,7 +119,9 @@ function Draw-TunableNode {
     Draw-CornerRivets
 }
 
-# ---- resource-source: a water tank on one side, phase fabric stacks on the other ----
+# ---- resource-source: generic source look (item chute, liquid pipe, heat vent) ----
+# The produced item/liquid are chosen by the player, so the sprite must NOT show a
+# specific resource -- it shows the three output ports instead.
 
 function Draw-ResourceSource {
     Draw-BasePlate
@@ -131,35 +133,33 @@ function Draw-ResourceSource {
     Fill 27 4 1 24 "44413d"
     Fill 4 27 24 1 "44413d"
 
-    # ---- left half: water tank ----
-    Fill 5 6 11 20 "1f1e1c"
-    Fill 6 12 9 13 "33509a"      # body of the water
-    Fill 6 12 9 1 "8fb0ee"       # bright waterline
-    Fill 6 24 9 1 "26407c"       # darker at the bottom
-    Fill 7 15 2 8 "4f74c0"       # highlight stripe
-    # tank walls
-    Fill 5 5 11 1 "5a564f"
-    Fill 5 26 11 1 "5a564f"
-    Fill 5 5 1 22 "5a564f"
-    Fill 15 5 1 22 "5a564f"
-    # little inlet on top of the tank
-    Fill 9 3 3 2 "6b665d"
+    # --- top port: item chute (gray track) ---
+    Fill 13 3 6 10 "4a4741"
+    Fill 14 3 4 10 "5d5952"
+    Fill 15 3 2 10 "8a857c"
+    Fill 13 8 6 1 "37342f"
 
-    # ---- right half: stacked phase fabric (item color f4ba6e) ----
-    Fill 17 5 10 22 "1f1e1c"
-    for ($i = 0; $i -lt 4; $i++) {
-        $y = 8 + $i * 5
-        Fill 18 $y 8 4 "f4ba6e"
-        Fill 18 $y 8 1 "ffd9a8"          # lit top edge
-        Fill 18 ($y + 3) 8 1 "b8843f"    # shaded bottom edge
-        Fill 21 ($y + 1) 1 2 "d99f57"    # fibre line
-        Fill 19 ($y + 1) 1 2 "ffe6c2"
-    }
-    # frame around the stacks
-    Fill 17 5 10 1 "5a564f"
-    Fill 17 26 10 1 "5a564f"
-    Fill 17 5 1 22 "5a564f"
-    Fill 26 5 1 22 "5a564f"
+    # --- right port: liquid pipe (blue) ---
+    Fill 19 13 10 6 "2b3f6e"
+    Fill 21 14 8 4 "4370c8"
+    Fill 22 15 6 1 "8fb0ee"
+    Fill 19 18 10 1 "1e2d51"
+
+    # --- bottom port: heat vent (orange) ---
+    Fill 13 19 6 10 "4a2c18"
+    Fill 14 21 4 8 "c96a1e"
+    Fill 15 22 2 6 "ffb257"
+    Fill 13 19 6 1 "33200f"
+
+    # --- left port: plain inlet (dark) ---
+    Fill 3 13 10 6 "3a3733"
+    Fill 3 15 10 2 "6b665d"
+
+    # --- central hub ---
+    Circle 15.5 15.5 7.5 "1d5c66" 170
+    Circle 15.5 15.5 6.0 "35a7bb" 200
+    Circle 15.5 15.5 4.2 "8fe8f7"
+    Circle 15.5 15.5 2.2 "e2fbff"
 
     Draw-CornerRivets
 }
