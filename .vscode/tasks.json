@@ -46,7 +46,7 @@
             "label": "Erekir Items: 重新生成贴图",
             "type": "shell",
             "command": "powershell",
-            "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/gen-tunable-node-sprite.ps1"],
+            "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/gen-sprites.ps1"],
             "problemMatcher": [],
             "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
         },
