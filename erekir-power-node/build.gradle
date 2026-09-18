@@ -1,0 +1,90 @@
+apply plugin: "java"
+
+// Mindustry 约定：Java 源码放在项目根的 src/ 下（不是 src/main/java）
+sourceSets.main.java.srcDirs = ["src"]
+
+ext{
+    // 只在“本机找不到任何游戏 jar”时才会联网下载官方 dependencies.jar
+    mindustryVersion = project.findProperty("mindustryVersion") ?: "v159.7"
+}
+
+/**
+ * 找编译用的 Mindustry 本体 jar，顺序：
+ *   1. 环境变量 MINDUSTRY_JAR
+ *   2. 本模组的 libs/dependencies.jar（从官方 Release 手动下载时用）
+ *   3. 本机已安装的游戏 jre/desktop.jar（Steam 各个常见盘符 / macOS / Linux）
+ * 找不到才回退到下面的 ivy 源去下载。
+ */
+def findMindustryJar(){
+    def env = System.getenv("MINDUSTRY_JAR")
+    if(env != null && new File(env).isFile()) return new File(env)
+
+    def local = file("libs/dependencies.jar")
+    if(local.isFile()) return local
+
+    def home = System.getProperty("user.home")
+    def candidates = [
+        // Windows：Steam 库常见盘符
+        "E:/SteamLibrary/steamapps/common/Mindustry/jre/desktop.jar",
+        "D:/SteamLibrary/steamapps/common/Mindustry/jre/desktop.jar",
+        "C:/Program Files (x86)/Steam/steamapps/common/Mindustry/jre/desktop.jar",
+        // macOS（Steam 库可能在外置盘，再兜底默认库）
+        "/Volumes/ORICO/SteamLibrary/steamapps/common/Mindustry/Mindustry.app/Contents/Resources/desktop.jar",
+        "${home}/Library/Application Support/Steam/steamapps/common/Mindustry/Mindustry.app/Contents/Resources/desktop.jar",
+        // Linux
+        "${home}/.steam/steam/steamapps/common/Mindustry/desktop.jar",
+        "${home}/.local/share/Steam/steamapps/common/Mindustry/desktop.jar",
+    ]
+    for(c in candidates){
+        def f = new File(c)
+        if(f.isFile()) return f
+    }
+    return null
+}
+
+def mindustryJar = findMindustryJar()
+
+repositories{
+    mavenCentral()
+
+    // 官方依赖来源：Mindustry 的 GitHub Release 里的 dependencies.jar
+    ivy{
+        url = "https://github.com/"
+        patternLayout{
+            artifact "/[organisation]/[module]/releases/download/[revision]/dependencies.jar"
+        }
+        metadataSources{ artifact() }
+        content{ includeVersion("Anuken", "Mindustry", mindustryVersion) }
+    }
+}
+
+dependencies{
+    if(mindustryJar != null){
+        println "[erekir-power-node] 编译依赖: ${mindustryJar}"
+        compileOnly files(mindustryJar)
+    }else{
+        println "[erekir-power-node] 本机未找到游戏 jar，回退下载 ${mindustryVersion}"
+        compileOnly "Anuken:Mindustry:$mindustryVersion"
+    }
+}
+
+tasks.withType(JavaCompile).configureEach{
+    options.encoding = "UTF-8"
+    // 游戏的类文件是 Java 17（major 61）
+    options.release = 17
+}
+
+jar{
+    archiveFileName = "erekir-power-node.jar"
+
+    // mod.hjson 必须在 jar 根目录
+    from(projectDir){ include "mod.hjson" }
+
+    // assets/ 的内容直接铺到 jar 根目录，所以：
+    //   assets/sprites/xxx.png   -> sprites/xxx.png  （游戏按 sprites/ 读贴图）
+    //   assets/bundles/xxx.properties -> bundles/xxx.properties（游戏按 bundles/ 读语言包）
+    from("assets/"){
+        include "**"
+        exclude "**/.gitkeep"
+    }
+}

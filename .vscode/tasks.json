@@ -25,7 +25,45 @@
                 "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/pack.ps1"]
             }
         },
+        // ---- Erekir Power Node（Windows：pack.ps1 + 离线校验脚本）----
+        {
+            "label": "Erekir Node: 构建 / 安装",
+            "type": "shell",
+            "command": "powershell",
+            "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/pack.ps1", "-Mod", "erekir-power-node", "-Install"],
+            "problemMatcher": ["$javac"],
+            "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+        },
+        {
+            "label": "Erekir Node: 校验产物",
+            "type": "shell",
+            "command": "powershell",
+            "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/pnverify/verify.ps1"],
+            "problemMatcher": ["$javac"],
+            "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+        },
+        {
+            "label": "Erekir Node: 重新生成贴图",
+            "type": "shell",
+            "command": "powershell",
+            "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/gen-erekir-node-sprite.ps1"],
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+        },
         // ---- Enemy Pause（macOS：依赖 build.sh 等脚本与 tools/jdk 内置工具链）----
+        {
+            "label": "Enemy Pause: 构建 / 安装 / 拷桌面",
+            "type": "shell",
+            "command": "\"${workspaceFolder}/build.sh\" && \"${workspaceFolder}/deploy.sh\"",
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": ["$javac"],
+            "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+            "windows": {
+                "command": "powershell",
+                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/pack.ps1", "-Mod", "Enemy Pause", "-Install", "-Desktop"],
+                "problemMatcher": ["$javac"]
+            }
+        },
         {
             "label": "Mindustry: 构建模组",
             "type": "shell",

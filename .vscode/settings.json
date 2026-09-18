@@ -1,5 +1,5 @@
 {
-  // Mindustry 模组开发工作区设置（ra2-controls + Enemy Pause 合并后）
+  // Mindustry 模组开发工作区设置（ra2-controls + Enemy Pause + erekir-power-node 合并后）
   "files.associations": {
     "*.hjson": "hjson"
   },

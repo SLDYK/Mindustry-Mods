@@ -6,8 +6,9 @@
 |------|------|------|------------|
 | **ra2-controls** | `ra2-controls/` | RA2 风格指挥操作 Java 模组，见 `RA2-CONTROLS.md` / `PLAN.md` / `ra2-controls/README.md` | Windows |
 | **Enemy Pause** | `Enemy Pause/` | 战役模式下按键暂停 / 继续敌方侧的各种倒计时（进攻 / 扩建 / 生产），见下文 | macOS |
+| **erekir-power-node** | `erekir-power-node/` | 给行星埃里克尔加一个输出功率可调的电力节点（0 ~ 100 万电力/秒），见 `erekir-power-node/README.md` | Windows |
 
-两个模组相互独立（各自的 gradle 工程、各自的构建脚本），互不影响：
+三个模组相互独立（各自的 gradle 工程、各自的构建脚本），互不影响：
 
 - **Windows 侧**：`tools/pack.ps1` 构建并安装到游戏 mods 目录（自动探测 `E:\SteamLibrary\...\Mindustry\saves\mods`）
 - **macOS 侧**：`build.sh` / `deploy.sh` / `run.sh` / `check.sh` + `config.sh`，工具链在 `tools/jdk`、`tools/gradle-home`
@@ -26,6 +27,19 @@
 tools\pack.ps1 -Install      # Windows 等价操作
 ```
 
+`pack.ps1` 三个模组通用，`-Mod` 传目录名即可（`-Desktop` 额外拷一份到桌面）：
+
+```powershell
+# Enemy Pause：构建 -> 装到游戏 mods -> 拷一份到桌面
+tools\pack.ps1 -Mod "Enemy Pause" -Install -Desktop
+
+# 埃里克尔可调电力节点：构建 -> 装到游戏 mods
+tools\pack.ps1 -Mod "erekir-power-node" -Install
+```
+
+> 目录名不一定等于 jar 文件名（`Enemy Pause` 的产物是 `EnemyPause.jar`，取自 `settings.gradle`
+> 里的项目名），所以脚本在 `build\libs\<目录名>.jar` 不存在时会退回取 `build\libs` 下最新的那个 jar。
+
 游戏 `desktop.jar` 与 mods 目录自动跨平台探测（Windows Steam 库盘符 / macOS `Mindustry.app` / Linux）；找不到时设环境变量 `MINDUSTRY_JAR` 指向 `desktop.jar`。
 
 ## VS Code 任务
@@ -34,12 +48,18 @@ tools\pack.ps1 -Install      # Windows 等价操作
 |------|------|------|
 | RA2: 构建 (ra2-controls) | 双平台 | gradle 构建，输出 `ra2-controls/build/libs/ra2-controls.jar`；Windows 走 `pack.ps1`，macOS/Linux 走 `pack.sh` |
 | RA2: 构建并安装 | 双平台 | 构建并安装到游戏 mods 目录（自动探测：Windows Steam = 游戏目录 `saves/mods`；macOS = `~/Library/Application Support/Mindustry/mods`） |
+| Enemy Pause: 构建 / 安装 / 拷桌面 | 双平台 | macOS 走 `build.sh && deploy.sh`；**Windows 走 `pack.ps1 -Mod "Enemy Pause" -Install -Desktop`** |
+| Erekir Node: 构建 / 安装 | Windows | `pack.ps1 -Mod "erekir-power-node" -Install`，产物 `erekir-power-node/build/libs/erekir-power-node.jar` |
+| Erekir Node: 校验产物 | Windows | 跑 `tools/pnverify/verify.ps1`，离线校验 jar 结构与方块逻辑（62 项，不启动游戏） |
+| Erekir Node: 重新生成贴图 | Windows | 跑 `tools/gen-erekir-node-sprite.ps1` 重新生成方块贴图（PS + System.Drawing，无需美术工具） |
 | Mindustry: 构建模组 | macOS | 跑 `build.sh`（默认构建 `Enemy Pause/`），同时是默认构建任务（`Cmd+Shift+B`） |
 | Mindustry: 构建并部署 | macOS | `build.sh && deploy.sh` |
 | Mindustry: 校验产物 | macOS | `check.sh` 离线校验产物 |
 
-> `RA2:` 任务用 `windows` 覆盖做了分平台：Windows 上走 `tools/pack.ps1`，macOS/Linux 上走 `tools/pack.sh`。
-> `Mindustry:` 三个任务目前是 macOS 专属（依赖 `build.sh` 等脚本和 `tools/jdk` 内置工具链）。
+> `RA2:` 与 `Enemy Pause:` 任务用 `windows` 覆盖做了分平台：Windows 上走 `tools/pack.ps1`，
+> macOS/Linux 上走 `tools/pack.sh` / `build.sh`。
+> `Mindustry:` 三个任务目前是 macOS 专属（依赖 `build.sh` 等脚本和 `tools/jdk` 内置工具链）；
+> Windows 上等价操作直接跑 `build.sh`/`check.sh` 对应的 PowerShell 命令（见模组章节）。
 >
 > `.vscode/settings.json` 里 Java 工具链的绝对路径属于 macOS 开发机，已按注释保留，Windows 上使用系统 JDK。
 
@@ -54,7 +74,7 @@ tools\pack.ps1 -Install      # Windows 等价操作
 
 | 项目 | 值 |
 | --- | --- |
-| 游戏 | **Mindustry v160.1**（Steam 版，内置 JRE 25） |
+| 游戏 | **Mindustry v160.1**（Steam 版，内置 JRE 25；实测 `Version.build = 160`，即 `steam build 160.4`） |
 | 游戏目录（Windows） | `E:\SteamLibrary\steamapps\common\Mindustry`，数据目录就是游戏目录下的 `saves\`（mods 在 `saves\mods`） |
 | 游戏应用包（macOS） | `/Volumes/ORICO/SteamLibrary/steamapps/common/Mindustry/Mindustry.app` |
 | 真正生效的数据目录 | Windows：游戏目录下的 `saves\`；macOS：`Mindustry.app/Contents/Resources/saves/`（判断依据：里面有 `settings.bin`） |
@@ -81,8 +101,8 @@ tools\pack.ps1 -Install      # Windows 等价操作
 | 项 | 值 |
 | --- | --- |
 | 按键设置 | 在 设置 → 按键 的「常规」分组里可改（`keybind.enemy_pause` / `keybind.enemy_pause_skip`） |
-| 生效范围 | 暂停只在战役模式、且只对单机有效（`rules.waves` 或 `rules.attackMode` 至少开着一个）；跳过不限战役 |
-| 游戏内反馈 | 每次操作都在屏幕下方弹一条提示 |
+| 生效范围 | 暂停只在战役模式生效（`rules.waves` 或 `rules.attackMode` 至少开着一个）；跳过不限战役。**两者在联机里都只有主机端能操作** |
+| 游戏内反馈 | 每次操作都在屏幕下方弹一条提示；**联机时主机端按 Y 弹出/收回的提示会在所有客户端同时弹**，客户端自己按 Y / U 则弹「联机时仅主机端可控制」 |
 
 之所以选 `Y` / `U`：Mindustry 自带的绑定已经占掉了 a~z 里除 `i k l o u y` 以外的所有字母，
 其中语义最贴近的 `p`（地图标记 ping）和空格（游戏暂停）都被占了。
@@ -107,6 +127,10 @@ public boolean update(){
 // 界面显示的 = duration * 倍率 - countup，格式化成 MM:SS
 int i = (int)((duration * state.rules.objectiveTimerMultiplier - countup) / 60f);
 ```
+
+> 注意这个 `text()` 算的是 `limit - countup`：**countup 一旦越过上限，界面上的数字就是负数**
+> （`m = i / 60`、`s = i % 60` 都是负的，显示成类似 `-1:-5`）。这正是联机客户端的那个现象，
+> 原因见下文「联机同步」。
 
 第 1 项的时机：游戏在 `Logic.update()` 里这样推进倒计时
 
@@ -138,12 +162,68 @@ Events.fire(Trigger.afterGameUpdate);                    // ← 模组的写回�
 - 换地图 / 退出战役 / 游戏结束 / 玩法状态变了（`waves`、`attackMode` 都关掉）/ 期间放出去过一波
   （比如点了 HUD 的提前进攻），暂停会自动解除，不会残留到下一局。
 - 恢复时不需要「还原」：两个读数一直停在冻结值上，游戏自己会从那里接着加。
-- 多人游戏无效：这些状态都由服务端说了算，客户端改写会被同步覆盖。
+- **联机时只有主机端能操作**（v0.5.1 起强制）：客户端上两个键都只弹「联机时仅主机端可控制」，
+  不写任何状态。挡住的是 `Net.client()`（`!server && active`），所以单机与**自己开房的主机端**都不算
+  客户端、功能照常。必须在客户端侧拦住的原因：`skipWave()` 会在本地凭空刷出一批敌人并自行
+  `state.wave++`，目标完成也传不到别人那儿，随后都被服务端的状态覆盖——纯属不同步。
+- 主机端冻结的 `state.wavetime` 会随状态快照（`Call.stateSnapshot`，客户端直接赋值）下发，
+  **但地图目标的 `countup` 不参与同步**（`MapObjectives.update()` 的注释写明「客户端只更新计时、
+  不能完成目标」）。所以联机时客户端必须自己按住这两项——见下文「联机同步」。
+- **联机两端的分工**：主机端冻结后广播给所有客户端，客户端弹同样的提示并把自己的倒计时也停住；
+  客户端的 `countup` 只能就地取值（拿不到主机端的数字），若已经越过上限会被钳回阈值前 10 tick。
 - **不覆盖**：已经在场上的敌方单位、敌方工厂生产与激活、敌方基地 AI 的扩建/调度节奏，
   以及行星图上「敌方入侵已占领星区」的回合倒计时。
 
 > 演进记录：v0.1 只冻波次；v0.2 误把「敌方行为」也冻了（工厂激活、生产进度、基地 AI 计时器）；
-> v0.3 按需求移除行为类；v0.4 才找到真正该冻的第 2 项——地图目标里的计时目标；v0.5 加入 U 键跳过。
+> v0.3 按需求移除行为类；v0.4 才找到真正该冻的第 2 项——地图目标里的计时目标；v0.5 加入 U 键跳过；
+> v0.5.1 联机时把 Y / U 都限制在主机端（客户端只弹提示）；
+> v0.6.0 联机同步：主机端的状态广播给客户端，客户端弹同样的提示并把倒计时也停住
+> （`EnemyPausePacket`），跳过的目标完成改走 `Call.completeObjective` 以同步到客户端。
+
+#### 联机同步（v0.6.0）
+
+联机里的分工：**主机端真正操作，客户端跟着停**。两端各自持有一份 `EnemyTimers`。
+
+```
+主机端按 Y
+  ├─ 本地：EnemyTimers 冻住 wavetime / countup，弹「已暂停」
+  └─ Net.send(EnemyPausePacket(paused=true, waveTime=冻结读数), reliable)
+        └─ 客户端：onRemote() → 弹「已暂停」+ EnemyTimers.remote(waveTime) 把自己的也冻住
+主机端再按 Y（或局面变了自动解除）
+  └─ 广播 paused=false → 客户端弹「已继续」+ 放开
+```
+
+**为什么非要自己发封包**：倒计时的推进与目标完成都是服务端权威的，客户端既看不到
+「主机端按了 Y」，也推不出该把数字停在哪一帧。封包只有两个字段：
+
+| 字段 | 作用 |
+| --- | --- |
+| `paused` | 客户端据此弹提示、并按 / 放自己的倒计时 |
+| `waveTime` | 主机端冻结住的波次读数，客户端照抄，两边显示同一个数字 |
+
+实现要点：
+
+- 注册在 `EnemyPauseMod.init()` 里，**放在无头服务端判断之前**：封包 ID 是按注册顺序递增分配的
+  （`Net.registerPacket`），两端注册的东西不一样就会错位。且只在
+  `Net.getPacketClassId(...) == -1` 时注册——mod 重新加载会再跑一次 `init()`，重复注册会白占一个 ID。
+- `Packet.handleClient()` 跑在网络线程上，而这里要碰 `wavetime` / `countup`，所以用 `Core.app.post`
+  丢回主线程再执行。
+- 客户端不走 `usable()` 判断——它的 `!net.client()` 会让客户端永远「不可用」，
+  那就变成主机端停了、客户端照跑。客户端的可用性由主机端说了算（广播只会从真的暂停后发出）。
+- 安全性：Mindustry 在连接时会比对双方模组列表（`NetServer.handleConnect`，不一致直接踢），
+  所以联机里两端一定都装着本模组、也都注册了这个封包，ID 一致。
+- 已知限制：**改完代码后不要只在一端热重载**。封包 ID 是按注册顺序分配的，重载会让本地多分配一个 ID
+  （`packetToId` 里新旧类各占一个），与未重载的对端错位。两端一起重启就没有这个问题。
+
+**修掉的那个现象**：以前主机端暂停后，客户端会一直倒计时到负数。原因有两层：
+
+1. 地图目标的 `countup` **完全不参与同步**（只有 `wavetime` 走状态快照）。`MapObjectives.update()`
+   的注释写明「客户端只更新计时、不能完成目标」：客户端每帧照旧 `countup += delta`，却永远不会判定完成，
+   于是越过上限后一路累加，`TimerObjective.text()` 显示的 `limit - countup` 就变成负数。
+2. 波次倒计时虽然会被快照纠正，但快照间隔内客户端仍在自己递减，看起来“没停”。
+
+所以客户端收到广播后也用自己的 `EnemyTimers` 把两者按住；`countup` 已经在阈值外时会被钳回
+阈值前 10 tick（`MIN_HOLD_TICKS`），负数随即消失。
 
 #### 跳过（U 键）
 
@@ -171,6 +251,12 @@ Events.fire(Trigger.afterGameUpdate);                    // ← 模组的写回�
 - **如果在暂停状态下按 U，会先解除暂停**（按「自动解除」处理，不还原读数）——
   跳过之后时间正常流逝。
 - 菜单 / 编辑器里不做任何事：既没有「本轮倒计时」，也不能让 `runWave()` 在空世界上跑。
+- **联机里的客户端不做任何事**，只弹「联机时仅主机端可控制」。
+- 目标完成走的是 `Call.completeObjective(index)`，**不是直接 `done()`**：
+  单机下它就是本地执行 `done()`（已对 160.1 的字节码确认：`!net.server() && !net.active()` 时
+  本地调用），主机端除了本地执行还会额外把 `CompleteObjectiveCallPacket` 发给所有客户端。
+  直接调 `done()` 在联机下客户端什么也收不到，它的计时目标会一直跑下去、显示成负数，
+  而且永远不会从目标列表里消失。
 
 ### 目录结构
 
@@ -219,20 +305,25 @@ Copy-Item build\libs\EnemyPause.jar "E:\SteamLibrary\steamapps\common\Mindustry\
 4. 代码里以模组内部名为前缀的文案键（如 `enemy-pause.paused`）都在语言包里定义了
 
 另有 `tools/epverify`：离线验证，用真实游戏类构造最小环境（`Vars.state` + 目标 / 敌方 `TeamData`），
-不用启动游戏。两个程序都靠“先把结论写死、再跑实际代码对照”的方式抓 bug。
+不用启动游戏。三个程序都靠“先把结论写死、再跑实际代码对照”的方式抓 bug。
 
 | 程序 | 验证什么 |
 | --- | --- |
-| `VerifyEnemyTimers` | 计时目标与波次倒计时确实停住；且不会在暂停瞬间漏出“完成判定”（含只剩 0.5 tick 的边界） |
+| `VerifyEnemyTimers` | 计时目标与波次倒计时确实停住；且不会在暂停瞬间漏出“完成判定”（含只剩 0.5 tick 的边界）；客户端镜像按主机端读数冻结、越界读数被拉回 |
 | `VerifyEnemySkip` | 只跳“此刻正在跑”的计时目标；挂在未完成父目标下的子目标不被误跳；菜单状态与无目标时安全退化 |
+| `VerifyEnemyPause` | 联机同步：封包注册幂等与序列化往返；客户端收到广播后两个倒计时都停住、不判定完成；继续后恢复；主机端忽略自己的广播；客户端按键只提示不改状态 |
 
 ```bash
 CP="Enemy Pause/libs/dependencies.jar:Enemy Pause/build/libs/EnemyPause.jar"   # Windows 下分隔符改成 ;
-for V in VerifyEnemyTimers VerifyEnemySkip; do
+for V in VerifyEnemyTimers VerifyEnemySkip VerifyEnemyPause; do
   javac -encoding UTF-8 -implicit:none -sourcepath tools/epverify -cp "$CP" -d tools/epverify/out tools/epverify/$V.java
   java -Dfile.encoding=UTF-8 -cp "tools/epverify/out:$CP" $V
 done
 ```
+
+`VerifyEnemyPause` 用 `new Net(null)` + 反射改 `Net` 的私有字段 `active` / `server` 来伪造三种形态
+（单机 `false,false` / 主机端 `true,true` / 客户端 `true,false`——`client()` 的定义是 `!server && active`），
+所以不用真的开房就能把整条同步路径跑一遍。
 
 > `-sourcepath` 必须显式指定：`dependencies.jar` 里同时打包了 `.java` 源码，
 > 不指定的话 javac 会去隐式编译那些源码，报一堆找不到符号。
